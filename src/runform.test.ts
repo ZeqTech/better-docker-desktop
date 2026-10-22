@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FORM, lines, parsePresets, toOptions, upsertPreset, validateForm, type RunForm } from "./runform";
+import { EMPTY_FORM, lines, parsePresets, redactSecrets, toOptions, upsertPreset, validateForm, type RunForm } from "./runform";
 
 const form = (p: Partial<RunForm>): RunForm => ({ ...EMPTY_FORM, ...p });
 
@@ -43,5 +43,31 @@ describe("presets", () => {
     list = upsertPreset(list, { name: "zeta", form: form({ ports: "2:2" }) });
     expect(list.map((p) => p.name)).toEqual(["alpha", "zeta"]);
     expect(list[1].form.ports).toBe("2:2");
+  });
+});
+
+describe("redactSecrets", () => {
+  it("blanks secret-looking values but keeps the variable", () => {
+    const r = redactSecrets(form({ env: "POSTGRES_PASSWORD=hunter2\nAPI_KEY=abc\nLOG_LEVEL=debug\nAUTH_TOKEN=t" }));
+    expect(r.form.env).toBe("POSTGRES_PASSWORD=\nAPI_KEY=\nLOG_LEVEL=debug\nAUTH_TOKEN=");
+    expect(r.redacted).toEqual(["POSTGRES_PASSWORD", "API_KEY", "AUTH_TOKEN"]);
+  });
+  it("catches passwords embedded in URLs", () => {
+    const r = redactSecrets(form({ env: "DATABASE_URL=postgres://app:s3cret@db:5432/app\nPUBLIC_URL=https://example.com/path" }));
+    expect(r.form.env).toBe("DATABASE_URL=\nPUBLIC_URL=https://example.com/path");
+    expect(r.redacted).toEqual(["DATABASE_URL"]);
+  });
+  it("leaves other fields, blanks and empty values alone", () => {
+    const f = form({ name: "db", ports: "1:1", env: "TOKEN=\n\nNOEQUALS", command: "run" });
+    const r = redactSecrets(f);
+    expect(r.form).toEqual(f);
+    expect(r.redacted).toEqual([]);
+  });
+});
+
+describe("presets and secrets", () => {
+  it("strips secrets from presets stored by older versions", () => {
+    const raw = JSON.stringify([{ name: "db", form: { env: "POSTGRES_PASSWORD=old\nTZ=UTC" } }]);
+    expect(parsePresets(raw)[0].form.env).toBe("POSTGRES_PASSWORD=\nTZ=UTC");
   });
 });

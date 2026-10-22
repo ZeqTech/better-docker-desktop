@@ -1,5 +1,7 @@
 // Run-dialog form model: conversion to the backend options, client-side checks, saved presets.
 
+import { looksSecret } from "./inspect";
+
 export interface RunForm {
   name: string;
   ports: string; // one mapping per line: 8080:80
@@ -49,6 +51,36 @@ export function validateForm(f: RunForm): string[] {
   return errs;
 }
 
+// ---- secrets ----------------------------------------------------------------------------
+
+/** A value with credentials embedded in a URL, like postgres://user:password@host/db. */
+function valueHasCredentials(v: string): boolean {
+  return /:\/\/[^/\s:@]+:[^@\s]+@/.test(v);
+}
+
+/**
+ * Blank out the value of every secret-looking environment variable (by name, or because the value is
+ * a URL with a password in it). Presets are stored unencrypted, so they must not hold secrets.
+ */
+export function redactSecrets(form: RunForm): { form: RunForm; redacted: string[] } {
+  const redacted: string[] = [];
+  const env = form.env
+    .split(/\r?\n/)
+    .map((line) => {
+      const i = line.indexOf("=");
+      if (i <= 0) return line;
+      const key = line.slice(0, i).trim();
+      const value = line.slice(i + 1);
+      if (value.trim() !== "" && (looksSecret(key) || valueHasCredentials(value))) {
+        redacted.push(key);
+        return `${key}=`;
+      }
+      return line;
+    })
+    .join("\n");
+  return { form: { ...form, env }, redacted };
+}
+
 // ---- presets ----------------------------------------------------------------------------
 
 export interface Preset {
@@ -77,11 +109,12 @@ export function parsePresets(raw: string | null): Preset[] {
       const f = p.form as Record<string, unknown>;
       out.push({
         name,
-        form: {
+        // Presets saved by older versions may hold secrets; strip them on load.
+        form: redactSecrets({
           name: str(f.name), ports: str(f.ports), env: str(f.env), volumes: str(f.volumes),
           restart: RESTARTS.includes(f.restart as string) ? (f.restart as RunForm["restart"]) : "",
           command: str(f.command),
-        },
+        }).form,
       });
     }
     return out;

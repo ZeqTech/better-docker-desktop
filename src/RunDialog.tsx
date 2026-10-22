@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { api, errorText } from "./api";
 import {
-  EMPTY_FORM, loadPresets, savePresets, toOptions, upsertPreset, validateForm,
+  EMPTY_FORM, loadPresets, redactSecrets, savePresets, toOptions, upsertPreset, validateForm,
   type Preset, type RunForm,
 } from "./runform";
 import { Modal, useApp } from "./ui";
@@ -20,11 +20,13 @@ export function RunDialog({ image, label, onClose, onDone }: { image: string; la
   const savePreset = () => {
     const name = presetName.trim();
     if (!name) return;
-    const next = upsertPreset(presets, { name, form });
+    // Presets are stored unencrypted, so secret values are left out and entered again each time.
+    const { form: safe, redacted } = redactSecrets(form);
+    const next = upsertPreset(presets, { name, form: safe });
     setPresets(next);
     savePresets(next);
     setPresetName("");
-    app.notify(`Saved preset "${name}"`);
+    app.notify(redacted.length ? `Saved preset "${name}" without the value of ${redacted.join(", ")}` : `Saved preset "${name}"`);
   };
   const deletePreset = (name: string) => {
     const next = presets.filter((p) => p.name !== name);
@@ -80,7 +82,7 @@ export function RunDialog({ image, label, onClose, onDone }: { image: string; la
             </select>
           </label>
           <label>Ports (one per line)<textarea value={form.ports} onChange={(e) => set("ports", e.target.value)} placeholder={"8080:80\n5353:53/udp"} spellCheck={false} rows={3} /></label>
-          <label>Environment variables (one per line)<textarea value={form.env} onChange={(e) => set("env", e.target.value)} placeholder={"POSTGRES_PASSWORD=secret"} spellCheck={false} rows={3} /></label>
+          <label>Environment variables (one per line; presets do not keep secret values)<textarea value={form.env} onChange={(e) => set("env", e.target.value)} placeholder={"POSTGRES_PASSWORD=secret"} spellCheck={false} rows={3} /></label>
           <label>Volumes (one per line)<textarea value={form.volumes} onChange={(e) => set("volumes", e.target.value)} placeholder={"app-data:/var/lib/app\nC:\\src:/app:ro"} spellCheck={false} rows={3} /></label>
           <label>Command (optional, replaces the image default)<textarea value={form.command} onChange={(e) => set("command", e.target.value)} placeholder={'sh -c "echo hello"'} spellCheck={false} rows={3} /></label>
         </div>

@@ -1,0 +1,107 @@
+name: Release
+
+# Push a tag such as v0.1.0 to build Windows and macOS and publish a GitHub Release.
+# The tag must match the version in src-tauri/tauri.conf.json.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Check the tag matches the app version
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "Tag $TAG does not match tauri.conf.json version $VERSION. Bump the version or retag." >&2
+            exit 1
+          fi
+
+      # rust-toolchain.toml pins the Rust version; rustup installs it on first use.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # build.sh installs dependencies, runs the tests, then bundles.
+      - name: Build
+        env:
+          SKIP_TESTS: "0"
+        run: sh ./build.sh ${{ matrix.target }}
+
+      - name: Name the artifacts
+        run: |
+          mkdir -p release
+          shopt -s nullglob
+          if [ "${{ matrix.target }}" = win ]; then
+            for f in dist/*setup.exe; do cp "$f" "release/BetterDockerDesktop-$TAG-win-x64-setup.exe"; done
+            cp "dist/Better Docker Desktop.exe" "release/BetterDockerDesktop-$TAG-win-x64-portable.exe"
+          else
+            for f in dist/*.dmg; do cp "$f" "release/BetterDockerDesktop-$TAG-macos-universal.dmg"; done
+          fi
+          ls -l release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: release/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: release
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$TAG" release/* \
+            --title "Better Docker Desktop $TAG" \
+            --generate-notes \
+            --notes "Windows: run the setup installer, or the portable exe (no install). macOS: open the .dmg and drag the app to Applications. Neither build is code-signed: Windows SmartScreen may warn (More info, then Run anyway); on macOS, right-click the app and choose Open, or run: xattr -dr com.apple.quarantine \"/Applications/Better Docker Desktop.app\". Check downloads against SHA256SUMS.txt. Requires Docker installed on your machine."

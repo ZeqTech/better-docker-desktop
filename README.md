@@ -4,6 +4,20 @@ A lean Docker Desktop alternative in Tauri v2 with a dark red / burgundy theme. 
 
 Layout follows Docker Desktop: sidebar, summary cards, sortable tables, status bar.
 
+## Download
+
+Get the latest build from the [Releases](../../releases) page. You need Docker installed on your machine.
+
+- **Windows:** `BetterDockerDesktop-vX.Y.Z-win-x64-setup.exe` installs the app; `...-portable.exe` runs without installing.
+- **macOS:** `BetterDockerDesktop-vX.Y.Z-macos-universal.dmg` runs on Apple Silicon and Intel. Open it and drag the app to Applications.
+
+The builds are not code-signed, so the first launch shows a warning:
+
+- Windows SmartScreen: choose **More info**, then **Run anyway**.
+- macOS Gatekeeper: right-click the app and choose **Open**, or run `xattr -dr com.apple.quarantine "/Applications/Better Docker Desktop.app"`.
+
+Check a download against `SHA256SUMS.txt` from the same release (`Get-FileHash` on Windows, `shasum -a 256` on macOS).
+
 ## Sections
 
 - **Containers**
@@ -62,7 +76,20 @@ pnpm tauri dev                 # run the app
 pnpm test                      # tsc + vitest
 cd src-tauri && cargo test     # Rust unit tests
 ./make.sh win                  # installer + portable exe into dist/
+./make.sh mac                  # universal .dmg into dist/ (must run on a Mac)
+MAC_TARGET=aarch64-apple-darwin ./make.sh mac   # one architecture, about twice as fast
 ```
+
+## Releasing
+
+Bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, commit, then push a tag that matches:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` builds Windows and macOS on GitHub's runners (running the tests first), then publishes the installers and a `SHA256SUMS.txt` as a GitHub Release. It refuses to run if the tag does not match the version in `tauri.conf.json`. It can also be started by hand from the Actions tab for an existing tag.
 
 Live tests run against your real engine and create disposable `bdd-live-*` containers and volumes, removing them afterwards. They need at least one image already present locally and never pull:
 

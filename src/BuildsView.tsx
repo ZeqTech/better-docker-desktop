@@ -87,7 +87,7 @@ export function BuildsView({ refreshKey }: { refreshKey: number }) {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Name</th><th>Status</th><th>Duration</th><th>Steps</th><th>Started</th><th>Actions</th></tr>
+                <tr><th>Name</th><th>Status</th><th className="num">Duration</th><th>Steps</th><th>Started</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {shownBuilds.map((b) => (
@@ -109,7 +109,7 @@ export function BuildsView({ refreshKey }: { refreshKey: number }) {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>ID</th><th>Type</th><th>Description</th><th>Status</th><th>Size</th><th>Last used</th><th>Uses</th></tr>
+              <tr><th>ID</th><th>Type</th><th>Description</th><th>Status</th><th className="num">Size</th><th>Last used</th><th className="num">Uses</th></tr>
             </thead>
             <tbody>
               {shownCache.map((c) => <CacheRow key={c.id} c={c} />)}

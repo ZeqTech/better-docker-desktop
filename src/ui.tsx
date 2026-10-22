@@ -86,9 +86,9 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
   );
 }
 
-export function Th<T>({ label, k, sort, dir, onSort }: { label: string; k: keyof T; sort: keyof T; dir: Dir; onSort(k: keyof T): void }) {
+export function Th<T>({ label, k, sort, dir, onSort, num }: { label: string; k: keyof T; sort: keyof T; dir: Dir; onSort(k: keyof T): void; num?: boolean }) {
   return (
-    <th className="sortable" onClick={() => onSort(k)}>
+    <th className={`sortable${num ? " num" : ""}`} onClick={() => onSort(k)}>
       {label}
       {sort === k && <span className="arrow">{dir === "asc" ? " ▲" : " ▼"}</span>}
     </th>

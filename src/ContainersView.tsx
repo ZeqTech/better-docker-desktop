@@ -177,7 +177,7 @@ export function ContainersView({ refreshKey }: { refreshKey: number }) {
               <Th<Container> label="Image" k="image" sort={sort} dir={dir} onSort={onSort} />
               <Th<Container> label="Status" k="state" sort={sort} dir={dir} onSort={onSort} />
               <th>Port(s)</th>
-              <Th<Container> label="CPU" k="cpu" sort={sort} dir={dir} onSort={onSort} />
+              <Th<Container> label="CPU" k="cpu" sort={sort} dir={dir} onSort={onSort} num />
               <th>Created</th>
               <th>Actions</th>
             </tr>

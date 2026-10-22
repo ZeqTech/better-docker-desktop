@@ -109,7 +109,7 @@ tr.sel { background: var(--accent-soft); }
 tr.group td { background: rgba(179, 32, 63, 0.1); }
 tr.group small { display: inline; margin-left: 10px; }
 td.indent { padding-left: 30px; }
-td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.num, th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 th:has(+ th) { }
 td.actions { white-space: nowrap; text-align: right; width: 1%; }
 td.desc { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

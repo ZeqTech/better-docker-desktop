@@ -90,7 +90,7 @@ export function ImagesView({ refreshKey }: { refreshKey: number }) {
               <Th<Image> label="Name" k="ref" sort={sort} dir={dir} onSort={onSort} />
               <Th<Image> label="Status" k="inUse" sort={sort} dir={dir} onSort={onSort} />
               <th>Created</th>
-              <Th<Image> label="Size" k="size" sort={sort} dir={dir} onSort={onSort} />
+              <Th<Image> label="Size" k="size" sort={sort} dir={dir} onSort={onSort} num />
               <th>Actions</th>
             </tr>
           </thead>

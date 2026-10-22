@@ -80,7 +80,7 @@ export function VolumesView({ refreshKey }: { refreshKey: number }) {
               <Th<Volume> label="Name" k="name" sort={sort} dir={dir} onSort={onSort} />
               <Th<Volume> label="Status" k="links" sort={sort} dir={dir} onSort={onSort} />
               <Th<Volume> label="Driver" k="driver" sort={sort} dir={dir} onSort={onSort} />
-              <Th<Volume> label="Size" k="size" sort={sort} dir={dir} onSort={onSort} />
+              <Th<Volume> label="Size" k="size" sort={sort} dir={dir} onSort={onSort} num />
               <th>Actions</th>
             </tr>
           </thead>

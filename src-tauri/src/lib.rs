@@ -84,6 +84,21 @@ async fn volume_containers(name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn volume_helper_image() -> Result<Option<String>, String> {
+    blocking(docker::volume_helper_image).await
+}
+
+#[tauri::command]
+async fn volume_ls(volume: String, image: String, path: String) -> Result<String, String> {
+    blocking(move || docker::volume_ls(&volume, &image, &path)).await
+}
+
+#[tauri::command]
+async fn volume_read(volume: String, image: String, path: String) -> Result<String, String> {
+    blocking(move || docker::volume_read(&volume, &image, &path)).await
+}
+
+#[tauri::command]
 async fn list_containers() -> Result<String, String> {
     blocking(docker::list_containers).await
 }
@@ -246,6 +261,9 @@ pub fn run() {
             image_history,
             compose_project_action,
             volume_containers,
+            volume_helper_image,
+            volume_ls,
+            volume_read,
             container_ls,
             container_copy_out,
             container_copy_in,

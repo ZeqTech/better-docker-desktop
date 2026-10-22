@@ -336,6 +336,64 @@ pub fn write_engine_config(text: &str) -> Result<String, String> {
     Ok(normalized)
 }
 
+// ---- volume contents (read-only) ----------------------------------------------------------
+
+/// The tiny images used to read a volume. Only these may be run for browsing.
+pub fn is_helper_image(image: &str) -> bool {
+    let repo = image.split([':', '@']).next().unwrap_or("");
+    matches!(repo.rsplit('/').next(), Some("alpine") | Some("busybox"))
+}
+
+/// A local alpine or busybox image to read volumes with, if one exists. Never pulls.
+pub fn volume_helper_image() -> Result<Option<String>, String> {
+    let out = run(&["images", "--format", "{{.Repository}}:{{.Tag}}"])?;
+    Ok(out.lines().find(|l| !l.contains("<none>") && is_helper_image(l)).map(str::to_string))
+}
+
+/// A path inside the volume: absolute, no control characters and no `..` segments.
+pub fn valid_volume_path(p: &str) -> bool {
+    valid_container_path(p) && !p.split('/').any(|seg| seg == "..")
+}
+
+/// argv for a throwaway container that runs `program` on a path inside the volume. The volume is
+/// mounted read-only and the container has no network, no capabilities and a read-only root.
+pub fn volume_run_args(volume: &str, image: &str, program: &str, tool_args: &[&str], path: &str) -> Result<Vec<String>, String> {
+    let volume = name_arg(volume)?;
+    if !is_helper_image(image) || !valid_ref(image) {
+        return Err(format!("{image} is not a supported helper image (alpine or busybox)"));
+    }
+    if !valid_volume_path(path) {
+        return Err(format!("invalid path: {path}"));
+    }
+    let target = format!("/v{}", if path == "/" { "" } else { path });
+    let mut a: Vec<String> = [
+        "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+        "--read-only", "--pids-limit", "32", "--memory", "64m",
+    ]
+    .map(String::from)
+    .to_vec();
+    a.extend(["-v".into(), format!("{volume}:/v:ro"), "--entrypoint".into(), program.into(), image.into()]);
+    a.extend(tool_args.iter().map(|s| s.to_string()));
+    a.push("--".into());
+    a.push(if target.is_empty() { "/v".into() } else { target });
+    Ok(a)
+}
+
+/// `ls -la` of a folder inside a volume.
+pub fn volume_ls(volume: &str, image: &str, path: &str) -> Result<String, String> {
+    let a = volume_run_args(volume, image, "ls", &["-la"], path)?;
+    run(&a.iter().map(String::as_str).collect::<Vec<_>>())
+}
+
+/// At most the first 64 KiB of a file inside a volume.
+pub fn volume_read(volume: &str, image: &str, path: &str) -> Result<String, String> {
+    if path == "/" {
+        return Err("choose a file".to_string());
+    }
+    let a = volume_run_args(volume, image, "head", &["-c", "65536"], path)?;
+    run(&a.iter().map(String::as_str).collect::<Vec<_>>())
+}
+
 // ---- container files ------------------------------------------------------------------------
 
 /// Absolute path inside a container: no control characters, not just a flag-like string.
@@ -737,6 +795,29 @@ mod tests {
         assert!(stream_command("save", "app:1", "x.txt", 1, false, "").is_err());
         assert!(stream_command("load", "", "Z:\\missing.tar", 1, false, "").is_err());
         assert!(stream_command("save", "--bad", ok.to_str().unwrap(), 1, false, "").is_err());
+    }
+
+    #[test]
+    fn volume_browsing_is_read_only_and_confined() {
+        assert!(is_helper_image("alpine:3"));
+        assert!(is_helper_image("docker.io/library/busybox:latest"));
+        assert!(!is_helper_image("postgres:17"));
+        assert!(!is_helper_image("evil/alpine-clone:1"));
+
+        let a = volume_run_args("data", "alpine:3", "ls", &["-la"], "/sub dir").unwrap();
+        assert!(a.contains(&"data:/v:ro".to_string()), "volume must be mounted read-only");
+        assert!(a.windows(2).any(|w| w == ["--network", "none"]));
+        assert!(a.windows(2).any(|w| w == ["--cap-drop", "ALL"]));
+        assert!(a.contains(&"--read-only".to_string()) && a.contains(&"--rm".to_string()));
+        assert_eq!(&a[a.len() - 2..], ["--", "/v/sub dir"]);
+        assert_eq!(volume_run_args("data", "alpine:3", "ls", &["-la"], "/").unwrap().last().unwrap(), "/v");
+
+        assert!(volume_run_args("data", "alpine:3", "ls", &[], "/../etc").is_err());
+        assert!(volume_run_args("data", "alpine:3", "ls", &[], "/a/../../b").is_err());
+        assert!(volume_run_args("data", "alpine:3", "ls", &[], "relative").is_err());
+        assert!(volume_run_args("data", "postgres:17", "ls", &[], "/").is_err());
+        assert!(volume_run_args("-v", "alpine:3", "ls", &[], "/").is_err());
+        assert!(volume_read("data", "alpine:3", "/").is_err());
     }
 
     #[test]

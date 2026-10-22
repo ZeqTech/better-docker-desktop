@@ -224,6 +224,38 @@ fn compose_project_stop_start_down_by_name() {
 
 #[test]
 #[ignore]
+fn volume_contents_can_be_browsed_read_only() {
+    let Some(helper) = docker::volume_helper_image().unwrap() else {
+        eprintln!("skipped: no local alpine or busybox image (the app offers to pull one)");
+        return;
+    };
+    let vol = "bdd-live-browse";
+    let _ = docker::volume_remove(vol, true);
+    docker::volume_create(vol).unwrap();
+    // Seed the volume through a writable mount (this is test setup, not the app's read path).
+    docker::run(&[
+        "run", "--rm", "-v", &format!("{vol}:/d"), "--entrypoint", "sh", &helper, "-c",
+        "mkdir -p /d/sub && echo hello volume > /d/a.txt && echo nested > '/d/sub/b c.txt' && head -c 100000 /dev/zero > /d/big.bin",
+    ])
+    .expect("seed volume");
+
+    let root = docker::volume_ls(vol, &helper, "/").expect("ls /");
+    assert!(root.contains("a.txt") && root.contains("sub") && root.contains("big.bin"), "root listing:\n{root}");
+    let sub = docker::volume_ls(vol, &helper, "/sub").expect("ls /sub");
+    assert!(sub.contains("b c.txt"), "names with spaces survive:\n{sub}");
+    assert_eq!(docker::volume_read(vol, &helper, "/a.txt").unwrap().trim(), "hello volume");
+    assert_eq!(docker::volume_read(vol, &helper, "/big.bin").unwrap().len(), 65536, "reads are capped at 64 KiB");
+
+    // The mount really is read-only, and the app cannot be pointed outside the volume.
+    assert!(docker::run(&["run", "--rm", "-v", &format!("{vol}:/v:ro"), "--entrypoint", "touch", &helper, "/v/new"]).is_err());
+    assert!(docker::volume_ls(vol, &helper, "/../etc").is_err());
+    assert!(docker::run(&["ps", "-a", "--filter", "ancestor=alpine", "-q"]).unwrap().is_empty(), "helper containers are removed");
+
+    docker::volume_remove(vol, false).unwrap();
+}
+
+#[test]
+#[ignore]
 fn volumes_create_list_remove() {
     let name = "bdd-live-vol";
     let _ = docker::volume_remove(name, true);

@@ -59,6 +59,21 @@ async fn write_engine_config(content: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn container_ls(container: String, path: String) -> Result<String, String> {
+    blocking(move || docker::container_ls(&container, &path)).await
+}
+
+#[tauri::command]
+async fn container_copy_out(container: String, path: String, dest: String) -> Result<String, String> {
+    blocking(move || docker::container_copy_out(&container, &path, &dest)).await
+}
+
+#[tauri::command]
+async fn container_copy_in(container: String, src: String, dest: String) -> Result<String, String> {
+    blocking(move || docker::container_copy_in(&container, &src, &dest)).await
+}
+
+#[tauri::command]
 async fn list_containers() -> Result<String, String> {
     blocking(docker::list_containers).await
 }
@@ -212,6 +227,9 @@ pub fn run() {
             app_version,
             docker_status,
             start_engine,
+            container_ls,
+            container_copy_out,
+            container_copy_in,
             set_docker_path,
             read_engine_config,
             write_engine_config,

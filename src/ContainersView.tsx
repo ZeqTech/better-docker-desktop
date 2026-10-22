@@ -6,6 +6,7 @@ import {
 } from "./docker";
 import { DetailsTab, EnvTab, MountsTab } from "./ContainerTabs";
 import { InspectView } from "./InspectView";
+import { FilesTab } from "./FilesTab";
 import { StatsTab } from "./StatsTab";
 import { TerminalTab } from "./TerminalTab";
 import { parseInspect } from "./inspect";
@@ -238,8 +239,8 @@ function GroupRows({ project, items, collapsed, onToggle, onStart, onStop, rende
   );
 }
 
-const TAB_LABEL = { logs: "Logs", details: "Details", env: "Environment", mounts: "Mounts", terminal: "Terminal", stats: "Stats", inspect: "Inspect" } as const;
-const TABS = ["logs", "details", "env", "mounts", "terminal", "stats", "inspect"] as const;
+const TAB_LABEL = { logs: "Logs", details: "Details", env: "Environment", mounts: "Mounts", files: "Files", terminal: "Terminal", stats: "Stats", inspect: "Inspect" } as const;
+const TABS = ["logs", "details", "env", "mounts", "files", "terminal", "stats", "inspect"] as const;
 type Tab = (typeof TABS)[number];
 
 function ContainerDetail({ container: c, onBack, onAction }: {
@@ -303,6 +304,7 @@ function ContainerDetail({ container: c, onBack, onAction }: {
           </div>
         )}
         {tab === "terminal" && !running && <Empty>Start the container to open a terminal.</Empty>}
+        {tab === "files" && <FilesTab container={c.id} running={running} />}
         {tab === "inspect" && <InspectView kind="container" target={c.id} />}
         {tab === "stats" && <StatsTab container={c.id} running={running} />}
       </div>

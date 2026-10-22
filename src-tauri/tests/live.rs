@@ -128,6 +128,34 @@ fn stats_stream_emits_json_samples() {
 
 #[test]
 #[ignore]
+fn container_files_list_and_copy_round_trip() {
+    let name = "bdd-live-files";
+    cleanup(name);
+    let o = docker::RunOptions { image: local_image(), name: name.into(), command: "sleep 60".into(), ..Default::default() };
+    docker::image_run(&o).expect("run");
+
+    let listing = docker::container_ls(name, "/").expect("ls /");
+    assert!(listing.contains("etc"), "root listing should contain etc:\n{listing}");
+
+    let dir = std::env::temp_dir().join("bdd-live-files");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("hello.txt");
+    std::fs::write(&src, "hello from the host").unwrap();
+    docker::container_copy_in(name, src.to_str().unwrap(), "/tmp").expect("copy in");
+    assert!(docker::container_ls(name, "/tmp").unwrap().contains("hello.txt"));
+
+    let out = dir.join("out");
+    std::fs::create_dir_all(&out).unwrap();
+    docker::container_copy_out(name, "/tmp/hello.txt", out.to_str().unwrap()).expect("copy out");
+    assert_eq!(std::fs::read_to_string(out.join("hello.txt")).unwrap(), "hello from the host");
+
+    cleanup(name);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+#[ignore]
 fn volumes_create_list_remove() {
     let name = "bdd-live-vol";
     let _ = docker::volume_remove(name, true);

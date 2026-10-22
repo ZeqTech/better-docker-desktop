@@ -303,6 +303,41 @@ pub fn write_engine_config(text: &str) -> Result<String, String> {
     Ok(normalized)
 }
 
+// ---- container files ------------------------------------------------------------------------
+
+/// Absolute path inside a container: no control characters, not just a flag-like string.
+pub fn valid_container_path(p: &str) -> bool {
+    p.starts_with('/') && p.len() <= 4096 && !p.chars().any(|c| c.is_control())
+}
+
+fn container_path(p: &str) -> Result<&str, String> {
+    if valid_container_path(p) { Ok(p) } else { Err(format!("invalid container path: {p}")) }
+}
+
+/// `ls -la` of a directory inside a running container (works with busybox and GNU ls).
+pub fn container_ls(container: &str, path: &str) -> Result<String, String> {
+    run(&["exec", name_arg(container)?, "ls", "-la", "--", container_path(path)?])
+}
+
+fn host_path_exists(p: &str) -> Result<String, String> {
+    let canon = Path::new(p).canonicalize().map_err(|e| format!("{p}: {e}"))?;
+    Ok(canon.to_string_lossy().trim_start_matches(r"\\?\").to_string())
+}
+
+/// Copy `path` out of the container into the existing host folder `dest_dir`.
+pub fn container_copy_out(container: &str, path: &str, dest_dir: &str) -> Result<String, String> {
+    let src = format!("{}:{}", name_arg(container)?, container_path(path)?);
+    let dest = validate_dir(dest_dir)?;
+    run(&["cp", &src, &dest]).map(|_| format!("Copied to {dest}"))
+}
+
+/// Copy a host file or folder into the container directory `dest_dir`.
+pub fn container_copy_in(container: &str, src: &str, dest_dir: &str) -> Result<String, String> {
+    let host = host_path_exists(src)?;
+    let dest = format!("{}:{}/", name_arg(container)?, container_path(dest_dir)?.trim_end_matches('/'));
+    run(&["cp", &host, &dest]).map(|_| format!("Copied into {dest_dir}"))
+}
+
 // ---- inspect ------------------------------------------------------------------------------
 
 pub fn inspect(kind: &str, target: &str) -> Result<String, String> {
@@ -622,6 +657,19 @@ mod tests {
         assert!(run_args(&flag).is_err());
         let policy = RunOptions { image: "x".into(), restart: "sometimes".into(), ..Default::default() };
         assert!(run_args(&policy).is_err());
+    }
+
+    #[test]
+    fn container_paths_must_be_absolute_and_clean() {
+        assert!(valid_container_path("/var/log"));
+        assert!(valid_container_path("/"));
+        assert!(!valid_container_path("var/log"));
+        assert!(!valid_container_path("/a\nb"));
+        assert!(!valid_container_path("--help"));
+        assert!(container_ls("web", "relative").is_err());
+        assert!(container_ls("-x", "/").is_err());
+        assert!(container_copy_in("web", "Z:\\definitely\\missing", "/tmp").is_err());
+        assert!(container_copy_out("web", "/etc", "Z:\\definitely\\missing").is_err());
     }
 
     #[test]

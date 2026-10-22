@@ -19,6 +19,12 @@ describe("parseSettings", () => {
     expect(s.compact).toBe(DEFAULTS.compact);
     expect(s.dockerPath).toBe("");
   });
+  it("defaults the map to 60 seconds and accepts only listed intervals", () => {
+    expect(DEFAULTS.mapRefreshSeconds).toBe(60);
+    expect(parseSettings(JSON.stringify({ mapRefreshSeconds: 30 })).mapRefreshSeconds).toBe(30);
+    expect(parseSettings(JSON.stringify({ mapRefreshSeconds: 0 })).mapRefreshSeconds).toBe(0);
+    expect(parseSettings(JSON.stringify({ mapRefreshSeconds: 7 })).mapRefreshSeconds).toBe(60);
+  });
   it("remembers the log wrap choice", () => {
     expect(DEFAULTS.logWrap).toBe(true);
     expect(parseSettings(JSON.stringify({ logWrap: false })).logWrap).toBe(false);

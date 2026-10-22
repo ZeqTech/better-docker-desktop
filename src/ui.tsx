@@ -28,7 +28,7 @@ export const useApp = () => useContext(Ctx);
 // ---- data hook ------------------------------------------------------------------------
 
 /** Fetch on mount, then every `interval` ms (0 = never) and whenever `trigger` changes (e.g. a Docker event). */
-export function useData<T>(fetcher: () => Promise<T>, interval = 0, trigger = 0) {
+export function useData<T>(fetcher: () => Promise<T>, interval = 0, trigger: number | string = 0) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

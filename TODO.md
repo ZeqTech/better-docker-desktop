@@ -1,6 +1,6 @@
 # Better Docker Desktop — TODO
 
-Scope: **local only** (Docker Engine on this machine through the `docker` CLI; the only network use is pulling an image on request). Sections: Containers, Images, Volumes, Builds, plus Settings, Clean up and Activity.
+Scope: Docker is **local only**; Kubernetes goes through `kubectl` and any context in the kubeconfig (Docker Engine on this machine through the `docker` CLI; the only network use is pulling an image on request). Sections: Containers, Images, Volumes, Builds, plus Settings, Clean up and Activity.
 
 ## Open questions (answer these and I will pick the items up)
 
@@ -28,6 +28,8 @@ Scope: **local only** (Docker Engine on this machine through the `docker` CLI; t
 - Light theme: the app is intentionally dark red
 
 ## Done
+
+- Kubernetes (via kubectl, `--context=` on every call so the kubeconfig is never changed): context and namespace pickers, Nodes (cordon, pods, describe, YAML), Pods (logs, shell, containers, describe, YAML, delete), Workloads (restart, scale), Services, Events; production-looking contexts get a louder confirmation
 
 - Setup: Tauri 2 + React + TypeScript + Vite, Rust backend, portable build and installer, burgundy icon, accent colours, compact tables
 - Engine: detect, version and status, auto-start Docker Desktop, reconnect, timeouts for a stuck engine, custom Docker CLI path, `daemon.json` editor

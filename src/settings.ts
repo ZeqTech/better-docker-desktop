@@ -8,6 +8,7 @@ export interface Settings {
   startPage: "last" | PageId;
   confirmDestructive: boolean;
   refreshSeconds: number; // 0 = manual refresh only
+  mapRefreshSeconds: number; // cluster map; 0 = manual
   onlyRunning: boolean;
   logTail: number;
   logTimestamps: boolean;
@@ -23,6 +24,7 @@ export const DEFAULTS: Settings = {
   startPage: "last",
   confirmDestructive: true,
   refreshSeconds: 3,
+  mapRefreshSeconds: 60,
   onlyRunning: false,
   logTail: 500,
   logTimestamps: true,
@@ -35,6 +37,7 @@ export const DEFAULTS: Settings = {
 
 export const PAGES: PageId[] = ["containers", "images", "volumes", "builds"];
 export const REFRESH_CHOICES = [0, 2, 3, 5, 10, 30];
+export const MAP_REFRESH_CHOICES = [0, 15, 30, 60, 120, 300];
 export const LOG_TAIL_CHOICES = [100, 500, 1000, 5000];
 
 export const ACCENTS: Record<AccentId, { label: string; accent: string; hi: string; soft: string }> = {
@@ -69,6 +72,7 @@ export function parseSettings(raw: string | null): Settings {
   bool("compact");
   if (v.startPage === "last" || PAGES.includes(v.startPage as PageId)) out.startPage = v.startPage as Settings["startPage"];
   if (REFRESH_CHOICES.includes(v.refreshSeconds as number)) out.refreshSeconds = v.refreshSeconds as number;
+  if (MAP_REFRESH_CHOICES.includes(v.mapRefreshSeconds as number)) out.mapRefreshSeconds = v.mapRefreshSeconds as number;
   if (LOG_TAIL_CHOICES.includes(v.logTail as number)) out.logTail = v.logTail as number;
   if (typeof v.dockerPath === "string" && v.dockerPath.length <= 500) out.dockerPath = v.dockerPath;
   if (typeof v.accent === "string" && v.accent in ACCENTS) out.accent = v.accent as AccentId;

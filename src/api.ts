@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { parseLines } from "./docker";
 import type { RunOptions } from "./runform";
+import type { KubeStatus } from "./kube";
 
 export interface Status {
   docker_version: string | null;
@@ -62,9 +63,16 @@ export const api = {
   volumeCreate: (name: string) => invoke<string>("volume_create", { name }),
   volumeRemove: (name: string, force: boolean) => invoke<string>("volume_remove", { name, force }),
   buildHistoryRemove: (reference: string) => invoke<string>("build_history_remove", { reference }),
+  kubeStatus: () => invoke<KubeStatus>("kube_status"),
+  kubeGet: (context: string, kind: string, namespace: string) => invoke<string>("kube_get", { context, kind, namespace }),
+  kubeMetrics: (context: string, kind: "pods" | "nodes") => invoke<string>("kube_metrics", { context, kind }),
+  kubeShow: (context: string, mode: "describe" | "yaml", kind: string, name: string, namespace: string) =>
+    invoke<string>("kube_show", { context, mode, kind, name, namespace }),
+  kubeAct: (context: string, action: string, kind: string, name: string, namespace: string) =>
+    invoke<string>("kube_act", { context, action, kind, name, namespace }),
 };
 
-export type StreamKind = "logs" | "pull" | "build" | "events" | "stats" | "save" | "load";
+export type StreamKind = "logs" | "pull" | "build" | "events" | "stats" | "save" | "load" | "kubelogs";
 
 export interface StreamHandlers {
   onLine(line: string): void;

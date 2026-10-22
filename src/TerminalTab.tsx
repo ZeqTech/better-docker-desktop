@@ -5,12 +5,21 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
-/** An interactive shell inside a running container, backed by a pseudo-terminal on the Rust side. */
-export function TerminalTab({ container }: { container: string }) {
+export interface KubeShell {
+  context: string;
+  namespace: string;
+  pod: string;
+}
+
+/**
+ * An interactive shell inside a running container (or, with `kube`, a pod container),
+ * backed by a pseudo-terminal on the Rust side.
+ */
+export function TerminalTab({ container, kube }: { container: string; kube?: KubeShell }) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const id = `shell:${container}`;
+    const id = kube ? `shell:k8s:${kube.context}/${kube.namespace}/${kube.pod}/${container}` : `shell:${container}`;
     const term = new Terminal({
       fontSize: 13,
       fontFamily: 'Consolas, "Cascadia Mono", monospace',
@@ -39,7 +48,10 @@ export function TerminalTab({ container }: { container: string }) {
     ];
     Promise.all(unlisten).then(() => {
       if (!alive) return;
-      invoke("start_shell", { id, container, cols: term.cols, rows: term.rows }).catch((e) => term.write(`\r\n${String(e)}\r\n`));
+      invoke("start_shell", {
+        id, container, cols: term.cols, rows: term.rows,
+        kubeContext: kube?.context, kubeNamespace: kube?.namespace, kubePod: kube?.pod,
+      }).catch((e) => term.write(`\r\n${String(e)}\r\n`));
     });
 
     const input = term.onData((data) => void invoke("shell_write", { id, data }).catch(() => {}));
@@ -62,7 +74,8 @@ export function TerminalTab({ container }: { container: string }) {
       void invoke("stop_shell", { id });
       term.dispose();
     };
-  }, [container]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [container, kube?.context, kube?.namespace, kube?.pod]);
 
   return <div ref={host} className="term-host" />;
 }

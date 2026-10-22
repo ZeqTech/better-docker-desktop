@@ -42,10 +42,17 @@ pub fn start_shell(
     container: String,
     cols: u16,
     rows: u16,
+    kube_context: Option<String>,
+    kube_namespace: Option<String>,
+    kube_pod: Option<String>,
 ) -> Result<(), String> {
-    let args = crate::docker::shell_args(&container)?;
+    // A pod target runs `kubectl exec`; otherwise `container` is a Docker container.
+    let (program, args) = match (kube_context, kube_namespace, kube_pod) {
+        (Some(c), Some(n), Some(p)) => (std::path::PathBuf::from(crate::kube::program()), crate::kube::shell_args(&c, &n, &p, &container)?),
+        _ => (crate::docker::program(), crate::docker::shell_args(&container)?),
+    };
     let pair = native_pty_system().openpty(size(cols, rows)).map_err(|e| e.to_string())?;
-    let mut cmd = CommandBuilder::new(crate::docker::program());
+    let mut cmd = CommandBuilder::new(program);
     cmd.args(&args);
     cmd.env("TERM", "xterm-256color");
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;

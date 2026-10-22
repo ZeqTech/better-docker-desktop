@@ -1,4 +1,5 @@
 pub mod docker;
+pub mod kube;
 mod shell;
 
 use std::collections::HashMap;
@@ -166,6 +167,31 @@ async fn prune(kind: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn kube_status() -> Result<kube::KubeStatus, String> {
+    blocking(|| Ok(kube::status())).await
+}
+
+#[tauri::command]
+async fn kube_get(context: String, kind: String, namespace: String) -> Result<String, String> {
+    blocking(move || kube::get(&context, &kind, &namespace)).await
+}
+
+#[tauri::command]
+async fn kube_metrics(context: String, kind: String) -> Result<String, String> {
+    blocking(move || kube::metrics(&context, &kind)).await
+}
+
+#[tauri::command]
+async fn kube_show(context: String, mode: String, kind: String, name: String, namespace: String) -> Result<String, String> {
+    blocking(move || kube::show(&context, &mode, &kind, &name, &namespace)).await
+}
+
+#[tauri::command]
+async fn kube_act(context: String, action: String, kind: String, name: String, namespace: String) -> Result<String, String> {
+    blocking(move || kube::act(&context, &action, &kind, &name, &namespace)).await
+}
+
+#[tauri::command]
 async fn volume_create(name: String) -> Result<String, String> {
     blocking(move || docker::volume_create(&name)).await
 }
@@ -194,14 +220,19 @@ fn start_stream(
     timestamps: Option<bool>,
     since: Option<String>,
 ) -> Result<(), String> {
-    let mut cmd = docker::stream_command(
-        &kind,
-        &target,
-        context.as_deref().unwrap_or(""),
-        tail.unwrap_or(500),
-        timestamps.unwrap_or(true),
-        since.as_deref().unwrap_or(""),
-    )?;
+    let mut cmd = if kind == "kubelogs" {
+        // context = kubectl context, target = namespace/pod/container
+        kube::logs_command(context.as_deref().unwrap_or(""), &target, tail.unwrap_or(500), timestamps.unwrap_or(true))?
+    } else {
+        docker::stream_command(
+            &kind,
+            &target,
+            context.as_deref().unwrap_or(""),
+            tail.unwrap_or(500),
+            timestamps.unwrap_or(true),
+            since.as_deref().unwrap_or(""),
+        )?
+    };
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
     let out = child.stdout.take().ok_or("no stdout")?;
     let err = child.stderr.take().ok_or("no stderr")?;
@@ -256,6 +287,11 @@ pub fn run() {
         .manage(shell::Shells::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
+            kube_status,
+            kube_get,
+            kube_metrics,
+            kube_show,
+            kube_act,
             docker_status,
             start_engine,
             image_history,

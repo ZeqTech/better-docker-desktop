@@ -5,6 +5,10 @@ import { BuildsView } from "./BuildsView";
 import { CleanupDialog } from "./CleanupDialog";
 import { ContainersView } from "./ContainersView";
 import { ImagesView } from "./ImagesView";
+import { KubeMap } from "./KubeMap";
+import { KubeNav } from "./KubeNav";
+import { EventsView, NodesView, PodsView, ServicesView, WorkloadsView } from "./KubeViews";
+import { KUBE_PAGES, type KubePageId } from "./kube";
 import { SettingsView } from "./SettingsView";
 import { useSettings } from "./SettingsContext";
 import { PAGES, type PageId, type Settings } from "./settings";
@@ -13,11 +17,12 @@ import { focusSearch, useShortcuts } from "./useShortcuts";
 import { Ctx, Modal, useData, type AppCtx, type ConfirmOptions } from "./ui";
 import { VolumesView } from "./VolumesView";
 
-type Page = PageId | "settings";
+type Page = PageId | KubePageId | "settings";
 
 function initialPage(startPage: Settings["startPage"]): Page {
   if (startPage !== "last") return startPage;
   const last = localStorage.getItem("page");
+  if (KUBE_PAGES.includes(last as KubePageId)) return last as KubePageId;
   return PAGES.includes(last as PageId) ? (last as PageId) : "containers";
 }
 
@@ -44,6 +49,9 @@ export default function App() {
   const [cleaning, setCleaning] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const status = useData(api.status, starting ? 2000 : 5000);
+  const kubeStatus = useData(api.kubeStatus, 0, refreshKey);
+  const [kubeContext, setKubeContext] = useState(() => localStorage.getItem("kube.context") ?? "");
+  const [kubeNamespace, setKubeNamespace] = useState(() => localStorage.getItem("kube.namespace") ?? "");
   const nextId = useRef(0);
   const autoTried = useRef(false);
   const startedAt = useRef(0);
@@ -53,6 +61,22 @@ export default function App() {
   useEffect(() => {
     if (page !== "settings") localStorage.setItem("page", page);
   }, [page]);
+
+  // Use the remembered context while it still exists, else kubectl's current one, else the first.
+  const kStatus = kubeStatus.data;
+  const activeContext = kStatus?.contexts.includes(kubeContext) ? kubeContext : (kStatus?.current ?? kStatus?.contexts[0] ?? "");
+  const kube = { context: activeContext, namespace: kubeNamespace };
+  const chooseContext = (c: string) => {
+    setKubeContext(c);
+    setKubeNamespace("");
+    localStorage.setItem("kube.context", c);
+    localStorage.setItem("kube.namespace", "");
+  };
+  const chooseNamespace = (ns: string) => {
+    setKubeNamespace(ns);
+    localStorage.setItem("kube.namespace", ns);
+  };
+  const isKubePage = KUBE_PAGES.includes(page as KubePageId);
 
   const notify = useCallback((text: string, kind: "ok" | "error" = "ok") => {
     const id = nextId.current++;
@@ -150,6 +174,7 @@ export default function App() {
             <span className="logo" aria-hidden>▣</span>
             <span>Better Docker<br />Desktop</span>
           </div>
+          <div className="nav-group">Docker</div>
           <nav>
             {NAV.map((n) => (
               <button key={n.id} className={page === n.id ? "active" : ""} onClick={() => setPage(n.id)}>
@@ -158,6 +183,16 @@ export default function App() {
               </button>
             ))}
           </nav>
+          <div className="nav-group">Kubernetes</div>
+          <KubeNav
+            status={kStatus ?? null}
+            context={activeContext}
+            namespace={kubeNamespace}
+            page={page}
+            onContext={chooseContext}
+            onNamespace={chooseNamespace}
+            onPage={setPage}
+          />
           <div className="sidebar-foot">
             <button onClick={() => setCleaning(true)} disabled={!up}>✦ Clean up…</button>
             <button className={page === "settings" ? "active" : ""} onClick={() => setPage("settings")}>⚙ Settings</button>
@@ -166,7 +201,7 @@ export default function App() {
         </aside>
 
         <main>
-          {!up && !status.loading && (
+          {!up && !status.loading && !isKubePage && (
             <div className="engine-down">
               <b>{starting ? "Starting Docker Engine…" : "Docker Engine is not running."}</b>
               <span>
@@ -182,6 +217,18 @@ export default function App() {
           {page === "images" && <ImagesView refreshKey={refreshKey} ticks={ticks} />}
           {page === "volumes" && <VolumesView refreshKey={refreshKey} ticks={ticks} />}
           {page === "builds" && <BuildsView refreshKey={refreshKey} ticks={ticks} />}
+          {isKubePage && !activeContext && <div className="empty">{kStatus?.error ?? "Checking kubectl…"}</div>}
+          {isKubePage && activeContext && (
+            // Keyed so a different context or namespace starts from a clean fetch.
+            <div className="kube-page" key={`${activeContext}|${kubeNamespace}|${refreshKey}`}>
+              {page === "k-map" && <KubeMap kube={kube} />}
+              {page === "k-nodes" && <NodesView kube={kube} />}
+              {page === "k-pods" && <PodsView kube={kube} />}
+              {page === "k-workloads" && <WorkloadsView kube={kube} />}
+              {page === "k-services" && <ServicesView kube={kube} />}
+              {page === "k-events" && <EventsView kube={kube} />}
+            </div>
+          )}
           {page === "settings" && <SettingsView status={s ?? null} onReconnect={() => { autoTried.current = true; void status.reload(); setRefreshKey((k) => k + 1); }} />}
         </main>
 
@@ -192,6 +239,7 @@ export default function App() {
           </span>
           {s?.docker_version && <span>Docker {s.docker_version}</span>}
           {s?.context && <span>Context: {s.context}</span>}
+          {activeContext && <span>Kube: {activeContext}</span>}
           <span className="spacer" />
           <button className="statusbtn" onClick={() => setShowActivity(true)}>Activity ({log.length})</button>
         </footer>

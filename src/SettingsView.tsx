@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorText, type Status } from "./api";
 import { useSettings } from "./SettingsContext";
 import {
-  ACCENTS, LOG_TAIL_CHOICES, PAGES, REFRESH_CHOICES, checkEngineJson,
+  ACCENTS, LOG_TAIL_CHOICES, MAP_REFRESH_CHOICES, PAGES, REFRESH_CHOICES, checkEngineJson,
   type AccentId, type PageId,
 } from "./settings";
 import { SHORTCUT_HELP } from "./shortcuts";
@@ -86,6 +86,11 @@ function General() {
       <Row title="Refresh lists every" hint="How often container and image lists update. Manual means use the Refresh buttons.">
         <select value={s.refreshSeconds} onChange={(e) => update({ refreshSeconds: Number(e.target.value) })}>
           {REFRESH_CHOICES.map((n) => <option key={n} value={n}>{n === 0 ? "Manual" : `${n} seconds`}</option>)}
+        </select>
+      </Row>
+      <Row title="Refresh the cluster map every" hint="How often the Kubernetes map reloads nodes and pods.">
+        <select value={s.mapRefreshSeconds} onChange={(e) => update({ mapRefreshSeconds: Number(e.target.value) })}>
+          {MAP_REFRESH_CHOICES.map((n) => <option key={n} value={n}>{n === 0 ? "Manual" : n >= 60 ? `${n / 60} minute${n === 60 ? "" : "s"}` : `${n} seconds`}</option>)}
         </select>
       </Row>
       <Row title="Log history" hint="Lines loaded when you open a container's Logs tab.">

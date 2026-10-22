@@ -45,7 +45,8 @@ export function StreamPanel({ kind, target, context = "", onEnd, reattach = fals
   const { logTail, logTimestamps, logWrap } = settings;
   const { update } = useSettings();
   // Pull/build output has no Docker timestamps to show.
-  const showTs = kind === "logs" && logTimestamps;
+  const isLogs = kind === "logs" || kind === "kubelogs";
+  const showTs = isLogs && logTimestamps;
   const [lines, setLines] = useState<string[]>([]);
   const [state, setState] = useState<State>("running");
   const [follow, setFollow] = useState(true);
@@ -129,7 +130,7 @@ export function StreamPanel({ kind, target, context = "", onEnd, reattach = fals
       <div className="toolbar">
         <span className={`pill ${state}`}>{LABEL[state]}</span>
         <span className="spacer" />
-        {kind === "logs" && (
+        {isLogs && (
           <label className="check"><input type="checkbox" checked={logTimestamps} onChange={(e) => update({ logTimestamps: e.target.checked })} /> Timestamps</label>
         )}
         <label className="check"><input type="checkbox" checked={logWrap} onChange={(e) => update({ logWrap: e.target.checked })} /> Wrap</label>

@@ -72,12 +72,18 @@ const TIMEOUT: Duration = Duration::from_secs(90);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(8);
 
 fn output_within(args: &[&str], limit: Duration) -> Result<Output, String> {
-    let mut child = command(args)
+    output_of(command(args), limit, "Docker", "Docker CLI")
+}
+
+/// Run a prepared command with a deadline, capturing both pipes. `who` names the tool in the
+/// timeout message and `cli` in the "not found" message.
+pub fn output_of(mut cmd: Command, limit: Duration, who: &str, cli: &str) -> Result<Output, String> {
+    let mut child = cmd
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Docker CLI not found: {e}"))?;
+        .map_err(|e| format!("{cli} not found: {e}"))?;
     let drain = |pipe: Option<Box<dyn Read + Send>>| {
         std::thread::spawn(move || {
             let mut buf = Vec::new();
@@ -96,10 +102,11 @@ fn output_within(args: &[&str], limit: Duration) -> Result<Output, String> {
             None if Instant::now() >= deadline => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!(
-                    "Docker did not respond within {}s. The engine may be stuck; restart Docker Desktop.",
-                    limit.as_secs()
-                ));
+                return Err(if who == "Docker" {
+                    format!("Docker did not respond within {}s. The engine may be stuck; restart Docker Desktop.", limit.as_secs())
+                } else {
+                    format!("{who} did not respond within {}s.", limit.as_secs())
+                });
             }
             None => std::thread::sleep(Duration::from_millis(20)),
         }

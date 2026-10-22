@@ -17,8 +17,8 @@ pub struct KubeStatus {
 const TIMEOUT: Duration = Duration::from_secs(30);
 const LOCAL_TIMEOUT: Duration = Duration::from_secs(8);
 
-pub fn program() -> &'static str {
-    if cfg!(windows) { "kubectl.exe" } else { "kubectl" }
+pub fn program() -> std::path::PathBuf {
+    crate::docker::find_tool(if cfg!(windows) { "kubectl.exe" } else { "kubectl" })
 }
 
 fn command(args: &[String]) -> Command {

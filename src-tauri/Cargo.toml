@@ -28,3 +28,16 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# Faster dev builds: less debug info to generate and link.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+# `pnpm tauri build --profile fast` (or --debug): an optimized-enough build without LTO.
+[profile.fast]
+inherits = "release"
+lto = false
+codegen-units = 16
+opt-level = 1
+strip = false

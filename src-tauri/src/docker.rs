@@ -47,7 +47,48 @@ pub fn program() -> PathBuf {
         .lock()
         .unwrap()
         .clone()
-        .unwrap_or_else(|| PathBuf::from(if cfg!(windows) { "docker.exe" } else { "docker" }))
+        .unwrap_or_else(|| find_tool(if cfg!(windows) { "docker.exe" } else { "docker" }))
+}
+
+/// Resolve a tool to an absolute path by searching PATH ourselves. On macOS the OS lookup at spawn
+/// time can ignore a PATH changed by `fix_path`, so the full path is passed to `Command` instead.
+/// Falls back to the bare name (the OS then reports "not found").
+pub fn find_tool(name: &str) -> PathBuf {
+    std::env::var_os("PATH")
+        .into_iter()
+        .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .map(|d| d.join(name))
+        .find(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from(name))
+}
+
+/// Apps launched from Finder inherit a minimal PATH (/usr/bin:/bin:...), so `docker`, its
+/// credential helpers and `kubectl` are not found even though they work in a terminal. Add the
+/// usual install locations (Docker Desktop, Homebrew, Rancher/Podman-style user dirs).
+pub fn fix_path() {
+    #[cfg(unix)]
+    {
+        let mut dirs: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
+        let mut extra = vec![
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/opt/homebrew/bin"),
+            PathBuf::from("/Applications/Docker.app/Contents/Resources/bin"),
+        ];
+        if let Some(home) = std::env::var_os("HOME") {
+            let home = PathBuf::from(home);
+            extra.push(home.join(".docker/bin"));
+            extra.push(home.join(".rd/bin"));
+        }
+        for d in extra {
+            if d.is_dir() && !dirs.contains(&d) {
+                dirs.push(d);
+            }
+        }
+        if let Ok(joined) = std::env::join_paths(dirs) {
+            // SAFETY: called once at startup, before any other thread reads the environment.
+            unsafe { std::env::set_var("PATH", joined) };
+        }
+    }
 }
 
 /// argv for an interactive shell in a container: bash when present, else sh.

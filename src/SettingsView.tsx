@@ -95,6 +95,9 @@ function General() {
       <Row title="Show timestamps in logs">
         <Switch label="Log timestamps" checked={s.logTimestamps} onChange={(v) => update({ logTimestamps: v })} />
       </Row>
+      <Row title="Notify when a container crashes" hint="Desktop notification when a container exits with an error or runs out of memory. Stopping a container yourself stays silent.">
+        <Switch label="Crash notifications" checked={s.notifyOnCrash} onChange={(v) => update({ notifyOnCrash: v })} />
+      </Row>
       <Row title="Wrap long log lines" hint="Also togglable in the Logs toolbar.">
         <Switch label="Wrap log lines" checked={s.logWrap} onChange={(v) => update({ logWrap: v })} />
       </Row>

@@ -55,7 +55,7 @@ export const api = {
   buildHistoryRemove: (reference: string) => invoke<string>("build_history_remove", { reference }),
 };
 
-export type StreamKind = "logs" | "pull" | "build";
+export type StreamKind = "logs" | "pull" | "build" | "events";
 
 export interface StreamHandlers {
   onLine(line: string): void;

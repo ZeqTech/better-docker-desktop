@@ -494,6 +494,23 @@ pub fn stream_command(
             command(&args)
         }
         "pull" => command(&["pull", ref_arg(target)?]),
+        // Lifecycle events only; health checks otherwise flood the stream with exec_* events.
+        "events" => {
+            const EVENTS: [&str; 18] = [
+                "create", "start", "stop", "die", "destroy", "kill", "oom", "pause", "unpause", "rename", "restart",
+                "health_status", "pull", "delete", "tag", "untag", "import", "load",
+            ];
+            let filters: Vec<String> = ["type=container", "type=image", "type=volume"]
+                .iter()
+                .map(|s| s.to_string())
+                .chain(EVENTS.iter().map(|e| format!("event={e}")))
+                .collect();
+            let mut args: Vec<&str> = vec!["events", "--format", "{{json .}}"];
+            for f in &filters {
+                args.extend(["--filter", f.as_str()]);
+            }
+            command(&args)
+        }
         "build" => {
             let dir = validate_dir(context)?;
             if !Path::new(&dir).join("Dockerfile").is_file() {

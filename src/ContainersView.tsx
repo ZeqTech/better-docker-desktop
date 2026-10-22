@@ -12,15 +12,16 @@ import { Empty, SearchBox, StatusDot, Summary, Th, useApp, useData, useSort } fr
 import { openUrl } from "./open";
 import { useSettings } from "./SettingsContext";
 import { pollMs } from "./settings";
+import type { Ticks } from "./events";
 
 const LABELS: Record<ContainerAction, string> = {
   start: "Start", stop: "Stop", restart: "Restart", pause: "Pause", unpause: "Resume", kill: "Kill", remove: "Delete",
 };
 
-export function ContainersView({ refreshKey }: { refreshKey: number }) {
+export function ContainersView({ refreshKey, ticks }: { refreshKey: number; ticks: Ticks }) {
   const app = useApp();
   const { settings } = useSettings();
-  const list = useData(api.containers, pollMs(settings));
+  const list = useData(api.containers, pollMs(settings), ticks.containers);
   const stats = useData(api.stats, pollMs(settings, 2));
   const [query, setQuery] = useState("");
   const [onlyRunning, setOnlyRunning] = useState(settings.onlyRunning);

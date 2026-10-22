@@ -12,6 +12,7 @@ export interface Settings {
   logTail: number;
   logTimestamps: boolean;
   logWrap: boolean;
+  notifyOnCrash: boolean;
   dockerPath: string; // empty = docker from PATH
   accent: AccentId;
   compact: boolean;
@@ -26,6 +27,7 @@ export const DEFAULTS: Settings = {
   logTail: 500,
   logTimestamps: true,
   logWrap: true,
+  notifyOnCrash: true,
   dockerPath: "",
   accent: "burgundy",
   compact: false,
@@ -55,7 +57,7 @@ export function parseSettings(raw: string | null): Settings {
   } catch {
     return out;
   }
-  const bool = (k: "autoStartEngine" | "confirmDestructive" | "onlyRunning" | "logTimestamps" | "logWrap" | "compact") => {
+  const bool = (k: "autoStartEngine" | "confirmDestructive" | "onlyRunning" | "logTimestamps" | "logWrap" | "notifyOnCrash" | "compact") => {
     if (typeof v[k] === "boolean") out[k] = v[k] as boolean;
   };
   bool("autoStartEngine");
@@ -63,6 +65,7 @@ export function parseSettings(raw: string | null): Settings {
   bool("onlyRunning");
   bool("logTimestamps");
   bool("logWrap");
+  bool("notifyOnCrash");
   bool("compact");
   if (v.startPage === "last" || PAGES.includes(v.startPage as PageId)) out.startPage = v.startPage as Settings["startPage"];
   if (REFRESH_CHOICES.includes(v.refreshSeconds as number)) out.refreshSeconds = v.refreshSeconds as number;

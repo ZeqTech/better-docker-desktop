@@ -4,15 +4,16 @@ import { formatSize, matches, sortRows, toContainers, toImages, type Image } fro
 import { InspectView } from "./InspectView";
 import { useSettings } from "./SettingsContext";
 import { pollMs } from "./settings";
+import type { Ticks } from "./events";
 import { RunDialog } from "./RunDialog";
 import { StreamModal } from "./StreamPanel";
 import { Empty, Modal, SearchBox, Summary, Th, useApp, useData, useSort } from "./ui";
 
-export function ImagesView({ refreshKey }: { refreshKey: number }) {
+export function ImagesView({ refreshKey, ticks }: { refreshKey: number; ticks: Ticks }) {
   const app = useApp();
-  const images = useData(api.images);
+  const images = useData(api.images, 0, ticks.images);
   const { settings } = useSettings();
-  const containers = useData(api.containers, pollMs(settings, 2));
+  const containers = useData(api.containers, pollMs(settings, 2), ticks.containers);
   const [query, setQuery] = useState("");
   const [onlyUnused, setOnlyUnused] = useState(false);
   const [pull, setPull] = useState<string | null>(null);

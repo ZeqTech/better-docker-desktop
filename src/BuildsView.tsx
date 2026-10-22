@@ -5,13 +5,14 @@ import {
   formatDuration, formatSize, matches, parseDiskUsage, timeAgo, toBuilds,
   type BuildRecord, type CacheRecord,
 } from "./docker";
+import type { Ticks } from "./events";
 import { StreamModal } from "./StreamPanel";
 import { Empty, Modal, SearchBox, Summary, useApp, useData } from "./ui";
 
-export function BuildsView({ refreshKey }: { refreshKey: number }) {
+export function BuildsView({ refreshKey, ticks }: { refreshKey: number; ticks: Ticks }) {
   const app = useApp();
   const [tab, setTab] = useState<"history" | "cache">("history");
-  const history = useData(api.buildHistory);
+  const history = useData(api.buildHistory, 0, ticks.images);
   const usage = useData(async () => parseDiskUsage(await api.diskUsage()));
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);

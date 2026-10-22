@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { api } from "./api";
 import { formatSize, matches, parseDiskUsage, sortRows, type Volume } from "./docker";
+import type { Ticks } from "./events";
 import { InspectView } from "./InspectView";
 import { TextPrompt } from "./ImagesView";
 import { Empty, Modal, SearchBox, Summary, Th, useApp, useData, useSort } from "./ui";
 
-export function VolumesView({ refreshKey }: { refreshKey: number }) {
+export function VolumesView({ refreshKey, ticks }: { refreshKey: number; ticks: Ticks }) {
   const app = useApp();
   // `system df -v` measures every volume, so it can take a few seconds on big hosts.
-  const usage = useData(async () => parseDiskUsage(await api.diskUsage()));
+  const usage = useData(async () => parseDiskUsage(await api.diskUsage()), 0, ticks.volumes);
   const [query, setQuery] = useState("");
   const [hideAnon, setHideAnon] = useState(false);
   const [creating, setCreating] = useState(false);

@@ -57,6 +57,42 @@ fn run_with_options_then_list_inspect_and_remove() {
 
 #[test]
 #[ignore]
+fn events_stream_reports_container_lifecycle() {
+    use std::io::{BufRead, BufReader};
+    use std::time::{Duration, Instant};
+
+    let name = "bdd-live-events";
+    cleanup(name);
+    let mut child = docker::stream_command("events", "", "", 500, true, "").unwrap().spawn().unwrap();
+    let out = child.stdout.take().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for l in BufReader::new(out).lines().map_while(Result::ok) {
+            if tx.send(l).is_err() {
+                break;
+            }
+        }
+    });
+    std::thread::sleep(Duration::from_secs(1));
+    let o = docker::RunOptions { image: local_image(), name: name.into(), command: "sleep 30".into(), ..Default::default() };
+    docker::image_run(&o).expect("run");
+    let (mut saw_start, mut noise) = (false, false);
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline && !saw_start {
+        if let Ok(line) = rx.recv_timeout(Duration::from_secs(1)) {
+            let ev = line.replace(' ', "");
+            noise |= ev.contains("exec_create") || ev.contains("exec_start");
+            saw_start |= ev.contains("\"Action\":\"start\"") && ev.contains(name);
+        }
+    }
+    let _ = child.kill();
+    cleanup(name);
+    assert!(saw_start, "no start event seen for {name}");
+    assert!(!noise, "exec_* events should be filtered out");
+}
+
+#[test]
+#[ignore]
 fn volumes_create_list_remove() {
     let name = "bdd-live-vol";
     let _ = docker::volume_remove(name, true);

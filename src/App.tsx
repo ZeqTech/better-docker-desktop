@@ -7,6 +7,7 @@ import { ImagesView } from "./ImagesView";
 import { SettingsView } from "./SettingsView";
 import { useSettings } from "./SettingsContext";
 import { PAGES, type PageId, type Settings } from "./settings";
+import { useEngineEvents } from "./useEngineEvents";
 import { Ctx, Modal, useData, type AppCtx, type ConfirmOptions } from "./ui";
 import { VolumesView } from "./VolumesView";
 
@@ -78,6 +79,7 @@ export default function App() {
 
   const s = status.data;
   const up = !!s?.daemon_running;
+  const ticks = useEngineEvents(up, settings.notifyOnCrash);
 
   const startEngine = useCallback(async () => {
     try {
@@ -149,10 +151,10 @@ export default function App() {
               {!starting && <button className="primary" onClick={() => void startEngine()}>Start Docker</button>}
             </div>
           )}
-          {page === "containers" && <ContainersView refreshKey={refreshKey} />}
-          {page === "images" && <ImagesView refreshKey={refreshKey} />}
-          {page === "volumes" && <VolumesView refreshKey={refreshKey} />}
-          {page === "builds" && <BuildsView refreshKey={refreshKey} />}
+          {page === "containers" && <ContainersView refreshKey={refreshKey} ticks={ticks} />}
+          {page === "images" && <ImagesView refreshKey={refreshKey} ticks={ticks} />}
+          {page === "volumes" && <VolumesView refreshKey={refreshKey} ticks={ticks} />}
+          {page === "builds" && <BuildsView refreshKey={refreshKey} ticks={ticks} />}
           {page === "settings" && <SettingsView status={s ?? null} onReconnect={() => { autoTried.current = true; void status.reload(); setRefreshKey((k) => k + 1); }} />}
         </main>
 

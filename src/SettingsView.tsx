@@ -6,6 +6,7 @@ import {
   ACCENTS, LOG_TAIL_CHOICES, PAGES, REFRESH_CHOICES, checkEngineJson,
   type AccentId, type PageId,
 } from "./settings";
+import { SHORTCUT_HELP } from "./shortcuts";
 import { useApp, useData } from "./ui";
 
 type Section = "general" | "docker" | "appearance" | "about";
@@ -231,6 +232,12 @@ function About({ status }: { status: Status | null }) {
       <Row title="Better Docker Desktop">{version.data ? `v${version.data}` : ""}</Row>
       <Row title="Docker Engine">{status?.daemon_running ? status.docker_version : "Not running"}</Row>
       <Row title="Context">{status?.context ?? "-"}</Row>
+      <h3 className="sub">Keyboard shortcuts</h3>
+      <dl className="kv shortcuts">
+        {SHORTCUT_HELP.map(([keys, what]) => (
+          <div key={keys}><dt className="mono">{keys}</dt><dd>{what}</dd></div>
+        ))}
+      </dl>
       <p className="muted">
         This app drives the docker command line. It shows and manages containers, images, volumes and builds, and needs a running Docker Engine.
       </p>

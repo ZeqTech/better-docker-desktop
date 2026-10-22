@@ -8,6 +8,7 @@ import { SettingsView } from "./SettingsView";
 import { useSettings } from "./SettingsContext";
 import { PAGES, type PageId, type Settings } from "./settings";
 import { useEngineEvents } from "./useEngineEvents";
+import { focusSearch, useShortcuts } from "./useShortcuts";
 import { Ctx, Modal, useData, type AppCtx, type ConfirmOptions } from "./ui";
 import { VolumesView } from "./VolumesView";
 
@@ -85,6 +86,25 @@ export default function App() {
     () => ({ containers: events.containers + refreshKey, images: events.images + refreshKey, volumes: events.volumes + refreshKey }),
     [events, refreshKey],
   );
+
+  useShortcuts((a) => {
+    switch (a.type) {
+      case "page":
+        setPage(a.page);
+        return true;
+      case "settings":
+        setPage("settings");
+        return true;
+      case "search":
+        return focusSearch();
+      case "refresh":
+        setRefreshKey((k) => k + 1);
+        void status.reload();
+        return true;
+      default:
+        return false;
+    }
+  });
 
   const startEngine = useCallback(async () => {
     try {

@@ -9,6 +9,7 @@ import { InspectView } from "./InspectView";
 import { FilesTab } from "./FilesTab";
 import { StatsTab } from "./StatsTab";
 import { TerminalTab } from "./TerminalTab";
+import { useShortcuts } from "./useShortcuts";
 import { parseInspect } from "./inspect";
 import { StreamPanel } from "./StreamPanel";
 import { Empty, SearchBox, StatusDot, Summary, Th, useApp, useData, useSort } from "./ui";
@@ -90,6 +91,12 @@ export function ContainersView({ refreshKey, ticks }: { refreshKey: number; tick
       },
     );
   };
+
+  useShortcuts((a) => {
+    if (a.type !== "delete" || detail || selected.size === 0) return false;
+    void bulk("remove");
+    return true;
+  });
 
   const toggle = (id: string) =>
     setSelected((s) => {

@@ -7,6 +7,7 @@ import {
 import { DetailsTab, EnvTab, MountsTab } from "./ContainerTabs";
 import { InspectView } from "./InspectView";
 import { StatsTab } from "./StatsTab";
+import { TerminalTab } from "./TerminalTab";
 import { parseInspect } from "./inspect";
 import { StreamPanel } from "./StreamPanel";
 import { Empty, SearchBox, StatusDot, Summary, Th, useApp, useData, useSort } from "./ui";
@@ -237,14 +238,19 @@ function GroupRows({ project, items, collapsed, onToggle, onStart, onStop, rende
   );
 }
 
-const TAB_LABEL = { logs: "Logs", details: "Details", env: "Environment", mounts: "Mounts", inspect: "Inspect", stats: "Stats" } as const;
+const TAB_LABEL = { logs: "Logs", details: "Details", env: "Environment", mounts: "Mounts", terminal: "Terminal", stats: "Stats", inspect: "Inspect" } as const;
+const TABS = ["logs", "details", "env", "mounts", "terminal", "stats", "inspect"] as const;
+type Tab = (typeof TABS)[number];
 
 function ContainerDetail({ container: c, onBack, onAction }: {
   container: Container;
   onBack(): void;
   onAction(c: Container, a: ContainerAction): Promise<void>;
 }) {
-  const [tab, setTab] = useState<"logs" | "details" | "env" | "mounts" | "inspect" | "stats">("logs");
+  const [tab, setTab] = useState<Tab>("logs");
+  // Once opened, the terminal stays mounted (hidden) so switching tabs does not end the session.
+  const [terminalOpened, setTerminalOpened] = useState(false);
+  const running = c.state === "running";
   const insp = useData(() => api.inspect("container", c.id));
   const details = useMemo(() => (insp.data ? parseInspect(insp.data) : null), [insp.data]);
   // Re-read after the container starts, stops or restarts.
@@ -273,8 +279,17 @@ function ContainerDetail({ container: c, onBack, onAction }: {
         {c.ports && <span>Ports <b>{c.ports}</b></span>}
       </div>
       <div className="tabs">
-        {(["logs", "details", "env", "mounts", "inspect", "stats"] as const).map((t) => (
-          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>
+        {TABS.map((t) => (
+          <button
+            key={t}
+            className={tab === t ? "active" : ""}
+            onClick={() => {
+              setTab(t);
+              if (t === "terminal") setTerminalOpened(true);
+            }}
+          >
+            {TAB_LABEL[t]}
+          </button>
         ))}
       </div>
       <div className="tab-body">
@@ -282,8 +297,14 @@ function ContainerDetail({ container: c, onBack, onAction }: {
         {tab === "details" && (details ? <DetailsTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
         {tab === "env" && (details ? <EnvTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
         {tab === "mounts" && (details ? <MountsTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
+        {terminalOpened && running && (
+          <div className="term-wrap" style={{ display: tab === "terminal" ? "flex" : "none" }}>
+            <TerminalTab container={c.id} />
+          </div>
+        )}
+        {tab === "terminal" && !running && <Empty>Start the container to open a terminal.</Empty>}
         {tab === "inspect" && <InspectView kind="container" target={c.id} />}
-        {tab === "stats" && <StatsTab container={c.id} running={c.state === "running"} />}
+        {tab === "stats" && <StatsTab container={c.id} running={running} />}
       </div>
     </section>
   );

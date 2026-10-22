@@ -273,3 +273,7 @@ td.val { word-break: break-all; }
 .chart .line { fill: none; stroke: var(--accent-hi); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
 .chart-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; }
 .chart-foot { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+
+/* terminal tab */
+.term-wrap { flex: 1; min-height: 0; flex-direction: column; }
+.term-host { flex: 1; min-height: 300px; background: #2b2325; border: 1px solid #4a3639; border-radius: 8px; padding: 6px 8px; overflow: hidden; }

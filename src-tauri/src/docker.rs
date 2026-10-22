@@ -36,9 +36,25 @@ pub fn set_docker_path(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The docker executable to run: the one chosen in Settings, else `docker` from PATH. On Windows
+/// the `.exe` is named explicitly because CreateProcess can resolve a bare name to a non-Win32 shim
+/// (that broke the PTY spawn).
+pub fn program() -> PathBuf {
+    DOCKER_PATH
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(if cfg!(windows) { "docker.exe" } else { "docker" }))
+}
+
+/// argv for an interactive shell in a container: bash when present, else sh.
+pub fn shell_args(container: &str) -> Result<Vec<String>, String> {
+    let c = name_arg(container)?;
+    Ok(["exec", "-it", c, "sh", "-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh"].map(String::from).to_vec())
+}
+
 fn command(args: &[&str]) -> Command {
-    let program = DOCKER_PATH.lock().unwrap().clone().unwrap_or_else(|| PathBuf::from("docker"));
-    let mut cmd = Command::new(program);
+    let mut cmd = Command::new(program());
     cmd.args(args);
     #[cfg(windows)]
     {
@@ -606,6 +622,13 @@ mod tests {
         assert!(run_args(&flag).is_err());
         let policy = RunOptions { image: "x".into(), restart: "sometimes".into(), ..Default::default() };
         assert!(run_args(&policy).is_err());
+    }
+
+    #[test]
+    fn shell_args_reject_injection() {
+        assert!(shell_args("--privileged").is_err());
+        assert!(shell_args("web;rm").is_err());
+        assert_eq!(shell_args("web-1").unwrap()[2], "web-1");
     }
 
     #[test]

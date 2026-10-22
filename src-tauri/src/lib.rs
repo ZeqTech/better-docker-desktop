@@ -1,4 +1,5 @@
 pub mod docker;
+mod shell;
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
@@ -206,6 +207,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .manage(Streams::default())
+        .manage(shell::Shells::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             docker_status,
@@ -228,7 +230,11 @@ pub fn run() {
             volume_remove,
             build_history_remove,
             start_stream,
-            stop_stream
+            stop_stream,
+            shell::start_shell,
+            shell::shell_write,
+            shell::shell_resize,
+            shell::stop_shell
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

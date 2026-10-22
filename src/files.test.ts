@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breadcrumbs, joinPath, parentPath, parseLs } from "./files";
+import { PREVIEW_LIMIT, breadcrumbs, describePreview, joinPath, parentPath, parseLs } from "./files";
 
 const busybox = `total 12
 drwxr-xr-x    1 root     root          4096 Oct 22 02:58 .
@@ -53,5 +53,18 @@ describe("paths", () => {
   it("builds breadcrumbs", () => {
     expect(breadcrumbs("/")).toEqual([["/", "/"]]);
     expect(breadcrumbs("/var/log")).toEqual([["/", "/"], ["var", "/var"], ["log", "/var/log"]]);
+  });
+});
+
+describe("describePreview", () => {
+  it("shows plain text", () => {
+    expect(describePreview("hello\n")).toEqual({ binary: false, truncated: false, text: "hello\n" });
+  });
+  it("hides binary content", () => {
+    expect(describePreview("ab\u0000cd")).toMatchObject({ binary: true, text: "" });
+  });
+  it("flags a full-size read as truncated", () => {
+    expect(describePreview("x".repeat(PREVIEW_LIMIT)).truncated).toBe(true);
+    expect(describePreview("x".repeat(PREVIEW_LIMIT - 1)).truncated).toBe(false);
   });
 });

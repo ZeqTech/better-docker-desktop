@@ -303,3 +303,9 @@ h3.sub { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-transfor
 .seg button.active { background: var(--accent); color: #fff; }
 td.nowrap { white-space: nowrap; width: 1%; }
 tr.crash td { color: var(--bad); }
+
+/* volume files */
+.helper-prompt { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; max-width: 640px; }
+.helper-prompt p { margin: 0; line-height: 1.5; }
+.helper-prompt code, .note code { background: var(--panel-hi); padding: 1px 6px; border-radius: 5px; font-size: 12.5px; }
+.note { margin: 0; font-size: 12.5px; }

@@ -2,11 +2,12 @@ import { useMemo, useState } from "react";
 import { api } from "./api";
 import { formatSize, toContainers, type Volume } from "./docker";
 import { InspectView } from "./InspectView";
+import { VolumeFiles } from "./VolumeFiles";
 import { Empty, Modal, StatusDot, useData } from "./ui";
 
 /** Which containers use a volume, plus raw inspect output. */
 export function VolumeDetail({ volume, onClose }: { volume: Volume; onClose(): void }) {
-  const [tab, setTab] = useState<"users" | "inspect">("users");
+  const [tab, setTab] = useState<"users" | "files" | "inspect">("users");
   const title = volume.anonymous ? `${volume.name.slice(0, 12)}…` : volume.name;
   return (
     <Modal title={title} onClose={onClose} wide>
@@ -17,9 +18,14 @@ export function VolumeDetail({ volume, onClose }: { volume: Volume; onClose(): v
       </div>
       <div className="tabs">
         <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Used by</button>
+        <button className={tab === "files" ? "active" : ""} onClick={() => setTab("files")}>Files</button>
         <button className={tab === "inspect" ? "active" : ""} onClick={() => setTab("inspect")}>Inspect</button>
       </div>
-      <div className="tab-body">{tab === "users" ? <Users name={volume.name} /> : <InspectView kind="volume" target={volume.name} />}</div>
+      <div className="tab-body">
+        {tab === "users" && <Users name={volume.name} />}
+        {tab === "files" && <VolumeFiles volume={volume.name} />}
+        {tab === "inspect" && <InspectView kind="volume" target={volume.name} />}
+      </div>
     </Modal>
   );
 }

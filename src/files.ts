@@ -55,3 +55,20 @@ export function breadcrumbs(p: string): [string, string][] {
   const parts = p.split("/").filter(Boolean);
   return [["/", "/"], ...parts.map((part, i): [string, string] => [part, "/" + parts.slice(0, i + 1).join("/")])];
 }
+
+// ---- file preview ---------------------------------------------------------------------
+
+export const PREVIEW_LIMIT = 65536;
+
+export interface Preview {
+  binary: boolean;
+  truncated: boolean;
+  text: string;
+}
+
+/** Decide how to show the (at most 64 KiB) start of a file. */
+export function describePreview(content: string): Preview {
+  const binary = content.includes("\u0000");
+  const truncated = new TextEncoder().encode(content).length >= PREVIEW_LIMIT;
+  return { binary, truncated, text: binary ? "" : content };
+}

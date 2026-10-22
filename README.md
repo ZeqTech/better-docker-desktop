@@ -19,6 +19,7 @@ Layout follows Docker Desktop: sidebar, summary cards, sortable tables, status b
 - **Volumes**
   - Sizes and in-use status, create, inspect, delete.
   - A "Used by" list of containers.
+  - A read-only **Files** tab to browse a volume and preview text files. It reads through a throwaway `alpine` or `busybox` container with no network and a read-only mount. If neither image is local the tab offers to pull `alpine:3` (about 8 MB).
 - **Builds**
   - Build history (Buildx 0.20+) and build cache.
   - New build from a folder with a Dockerfile, with a streamed log.

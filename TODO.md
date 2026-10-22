@@ -5,7 +5,6 @@ Scope: **local only** (Docker Engine on this machine through the `docker` CLI; t
 ## Open questions (answer these and I will pick the items up)
 
 - [ ] **Networks section** (list, inspect, create, remove)? It would be a fifth sidebar section, and you originally asked for four.
-- [ ] **Browse volume contents** read-only? Docker has no direct way, so it needs a throwaway helper container with `ls`. May I pull a tiny image such as `alpine` (about 5 MB) the first time, or should this stay out?
 - [ ] **Overview/dashboard page** with running counts, disk usage breakdown and recent activity as a landing page, or are the Containers page cards enough?
 - [ ] **Guard against deleting "production" things**: how should the app know what is production (a container label, a name pattern, a project)?
 
@@ -35,7 +34,7 @@ Scope: **local only** (Docker Engine on this machine through the `docker` CLI; t
 - Containers: list, search, sort, filter, group by Compose project (start, stop, restart, take down), start/stop/restart/pause/kill/delete, bulk actions, port links, run from an image with ports, env, volumes, restart policy and command, saved presets
 - Container detail: live colour-coded logs that follow restarts (wrap and timestamp toggles), Details with health checks, Environment, Mounts, Files (browse, upload, download), Terminal, live Stats charts, Inspect
 - Images: list, in-use state, pull with progress, run, tag, export and import `.tar`, layers, inspect, delete, clean up
-- Volumes: list with sizes, create, inspect, delete, used-by list, clean up
+- Volumes: list with sizes, create, inspect, delete, used-by list, read-only file browser and preview, clean up
 - Builds: history, cache, new build with streamed log
 - Clean up assistant, Activity log from Docker events, instant list updates from events, crash notifications, window position memory, keyboard shortcuts
 - Safety: confirmations, argv-only Docker calls with validated inputs, security notes in the README

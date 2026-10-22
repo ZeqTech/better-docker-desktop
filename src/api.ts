@@ -28,6 +28,7 @@ export type PruneKind = "images" | "containers" | "volumes" | "buildcache";
 export const api = {
   status: () => invoke<Status>("docker_status"),
   appVersion: () => invoke<string>("app_version"),
+  volumeContainers: async (name: string) => parseLines(await invoke<string>("volume_containers", { name })),
   imageHistory: (image: string) => invoke<string>("image_history", { image }),
   containerLs: (container: string, path: string) => invoke<string>("container_ls", { container, path }),
   copyOut: (container: string, path: string, dest: string) => invoke<string>("container_copy_out", { container, path, dest }),

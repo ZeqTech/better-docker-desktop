@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { api } from "./api";
 import { formatSize, matches, parseDiskUsage, sortRows, type Volume } from "./docker";
 import type { Ticks } from "./events";
-import { InspectView } from "./InspectView";
+import { VolumeDetail } from "./VolumeDetail";
 import { TextPrompt } from "./ImagesView";
-import { Empty, Modal, SearchBox, Summary, Th, useApp, useData, useSort } from "./ui";
+import { Empty, SearchBox, Summary, Th, useApp, useData, useSort } from "./ui";
 
 export function VolumesView({ refreshKey, ticks }: { refreshKey: number; ticks: Ticks }) {
   const app = useApp();
@@ -118,11 +118,7 @@ export function VolumesView({ refreshKey, ticks }: { refreshKey: number; ticks: 
           }}
         />
       )}
-      {inspect && (
-        <Modal title={inspect.anonymous ? `${inspect.name.slice(0, 12)}…` : inspect.name} onClose={() => setInspect(null)} wide>
-          <InspectView kind="volume" target={inspect.name} />
-        </Modal>
-      )}
+      {inspect && <VolumeDetail volume={inspect} onClose={() => setInspect(null)} />}
     </section>
   );
 }

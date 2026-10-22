@@ -178,6 +178,27 @@ fn image_history_save_and_load() {
 
 #[test]
 #[ignore]
+fn volume_users_are_listed() {
+    let (vol, name) = ("bdd-live-users-vol", "bdd-live-users");
+    cleanup(name);
+    let _ = docker::volume_remove(vol, true);
+    docker::volume_create(vol).unwrap();
+    assert!(docker::containers_using_volume(vol).unwrap().is_empty(), "fresh volume has no users");
+    let o = docker::RunOptions {
+        image: local_image(),
+        name: name.into(),
+        volumes: vec![format!("{vol}:/data")],
+        command: "sleep 30".into(),
+        ..Default::default()
+    };
+    docker::image_run(&o).expect("run");
+    assert!(docker::containers_using_volume(vol).unwrap().contains(name));
+    cleanup(name);
+    docker::volume_remove(vol, false).unwrap();
+}
+
+#[test]
+#[ignore]
 fn volumes_create_list_remove() {
     let name = "bdd-live-vol";
     let _ = docker::volume_remove(name, true);

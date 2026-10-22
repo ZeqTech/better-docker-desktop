@@ -232,6 +232,12 @@ pub fn list_containers() -> Result<String, String> {
     run(&["ps", "-a", "--no-trunc", "--format", "{{json .}}"])
 }
 
+/// Containers (running or not) that mount the named volume, as JSON lines.
+pub fn containers_using_volume(name: &str) -> Result<String, String> {
+    let filter = format!("volume={}", name_arg(name)?);
+    run(&["ps", "-a", "--no-trunc", "--filter", &filter, "--format", "{{json .}}"])
+}
+
 pub fn stats() -> Result<String, String> {
     run(&["stats", "--no-stream", "--format", "{{json .}}"])
 }

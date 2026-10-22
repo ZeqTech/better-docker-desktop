@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "./api";
+import { ActivityDialog } from "./ActivityDialog";
 import { BuildsView } from "./BuildsView";
 import { CleanupDialog } from "./CleanupDialog";
 import { ContainersView } from "./ContainersView";
@@ -41,6 +42,7 @@ export default function App() {
   const [asking, setAsking] = useState<{ o: ConfirmOptions; done(v: boolean): void } | null>(null);
   const [starting, setStarting] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const status = useData(api.status, starting ? 2000 : 5000);
   const nextId = useRef(0);
   const autoTried = useRef(false);
@@ -80,7 +82,7 @@ export default function App() {
 
   const s = status.data;
   const up = !!s?.daemon_running;
-  const events = useEngineEvents(up, settings.notifyOnCrash);
+  const { ticks: events, log } = useEngineEvents(up, settings.notifyOnCrash);
   // Docker events and "Refresh all" both make the lists refetch.
   const ticks = useMemo(
     () => ({ containers: events.containers + refreshKey, images: events.images + refreshKey, volumes: events.volumes + refreshKey }),
@@ -190,6 +192,8 @@ export default function App() {
           </span>
           {s?.docker_version && <span>Docker {s.docker_version}</span>}
           {s?.context && <span>Context: {s.context}</span>}
+          <span className="spacer" />
+          <button className="statusbtn" onClick={() => setShowActivity(true)}>Activity ({log.length})</button>
         </footer>
 
         <div className="toasts" aria-live="polite">
@@ -198,6 +202,7 @@ export default function App() {
           ))}
         </div>
 
+        {showActivity && <ActivityDialog log={log} onClose={() => setShowActivity(false)} />}
         {cleaning && <CleanupDialog onClose={() => setCleaning(false)} onDone={() => setRefreshKey((k) => k + 1)} />}
 
         {asking && (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { startStream } from "./api";
-import { CrashDetector, affected, parseEvent, type CrashAlert, type Ticks } from "./events";
+import { CrashDetector, affected, parseEvent, type CrashAlert, type LoggedEvent, type Ticks } from "./events";
 
 async function sendCrashNotification(a: CrashAlert): Promise<void> {
   try {
@@ -16,10 +16,11 @@ async function sendCrashNotification(a: CrashAlert): Promise<void> {
 /**
  * Follows `docker events` while the engine is up. Returns counters that change when containers,
  * images or volumes change, so views can refetch immediately instead of waiting for their poll.
- * Also raises a desktop notification when a container dies on its own.
+ * Also keeps a short activity log and raises a desktop notification when a container dies on its own.
  */
-export function useEngineEvents(up: boolean, notifyOnCrash: boolean): Ticks {
+export function useEngineEvents(up: boolean, notifyOnCrash: boolean): { ticks: Ticks; log: LoggedEvent[] } {
   const [ticks, setTicks] = useState<Ticks>({ containers: 0, images: 0, volumes: 0 });
+  const [log, setLog] = useState<LoggedEvent[]>([]);
   const notifyRef = useRef(notifyOnCrash);
   notifyRef.current = notifyOnCrash;
 
@@ -30,6 +31,7 @@ export function useEngineEvents(up: boolean, notifyOnCrash: boolean): Ticks {
     let retry: ReturnType<typeof setTimeout> | null = null;
     let flush: ReturnType<typeof setTimeout> | null = null;
     const pending = new Set<keyof Ticks>();
+    let batch: LoggedEvent[] = [];
     const crashes = new CrashDetector();
 
     const schedule = (ms: number) => {
@@ -41,12 +43,16 @@ export function useEngineEvents(up: boolean, notifyOnCrash: boolean): Ticks {
           const ev = parseEvent(line);
           if (!ev) return;
           affected(ev).forEach((k) => pending.add(k));
+          batch.push({ ...ev, time: Date.now() });
           if (!flush) {
             // Coalesce bursts (a compose up emits dozens of events) into one refresh.
             flush = setTimeout(() => {
               flush = null;
               const keys = [...pending];
               pending.clear();
+              const added = batch;
+              batch = [];
+              setLog((prev) => [...prev, ...added].slice(-300));
               setTicks((t) => {
                 const n = { ...t };
                 keys.forEach((k) => (n[k] += 1));
@@ -74,5 +80,5 @@ export function useEngineEvents(up: boolean, notifyOnCrash: boolean): Ticks {
     };
   }, [up]);
 
-  return ticks;
+  return { ticks, log };
 }

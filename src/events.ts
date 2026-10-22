@@ -8,6 +8,8 @@ export interface DockerEvent {
   name: string;
   exitCode: string;
   signal: string;
+  /** Text after the colon of the action, e.g. "healthy" for "health_status: healthy". */
+  detail: string;
 }
 
 /** Parse one `docker events --format '{{json .}}'` line; null for anything else. */
@@ -22,11 +24,17 @@ export function parseEvent(line: string): DockerEvent | null {
   const type = String(j.Type ?? "");
   const actor = (j.Actor ?? {}) as { ID?: string; Attributes?: Record<string, string> };
   const attrs = actor.Attributes ?? {};
+  const kind = type === "container" || type === "image" || type === "volume" ? type : "";
+  const id = String(actor.ID ?? j.id ?? "");
+  const rawAction = String(j.Action ?? j.status ?? "");
+  const colon = rawAction.indexOf(":");
   return {
-    type: type === "container" || type === "image" || type === "volume" ? type : "",
-    action: String(j.Action ?? j.status ?? "").split(":")[0].trim(),
-    id: String(actor.ID ?? j.id ?? ""),
-    name: attrs.name ?? "",
+    type: kind,
+    action: (colon < 0 ? rawAction : rawAction.slice(0, colon)).trim(),
+    detail: colon < 0 ? "" : rawAction.slice(colon + 1).trim(),
+    id,
+    // Images and volumes are named by their ID (a reference or volume name).
+    name: attrs.name ?? (kind === "container" || kind === "" ? "" : id.replace(/^sha256:/, "").slice(0, kind === "image" && id.startsWith("sha256:") ? 12 : 64)),
     exitCode: attrs.exitCode ?? "",
     signal: attrs.signal ?? "",
   };
@@ -75,4 +83,29 @@ export class CrashDetector {
     }
     return null;
   }
+}
+
+export interface LoggedEvent extends DockerEvent {
+  time: number;
+}
+
+const VERBS: Record<string, string> = {
+  create: "created", start: "started", stop: "stopped", destroy: "removed", pause: "paused", unpause: "resumed",
+  rename: "renamed", restart: "restarted", pull: "pulled", delete: "deleted", tag: "tagged", untag: "untagged",
+  import: "imported", load: "loaded", oom: "ran out of memory",
+};
+
+/** A short sentence for the activity log. */
+export function describeEvent(ev: DockerEvent): string {
+  const subject = `${ev.type ? ev.type[0].toUpperCase() + ev.type.slice(1) : "Object"} ${ev.name || ev.id.slice(0, 12)}`;
+  if (ev.action === "die") return `${subject} exited${ev.exitCode ? ` with code ${ev.exitCode}` : ""}`;
+  if (ev.action === "kill") return `${subject} was sent signal ${ev.signal || "?"}`;
+  if (ev.action === "health_status") return `${subject} is ${ev.detail || "checking"}`;
+  return `${subject} ${VERBS[ev.action] ?? ev.action}`;
+}
+
+/** Append an event to a log, keeping the newest `max` entries. */
+export function appendEvent(log: LoggedEvent[], ev: DockerEvent, time: number, max = 300): LoggedEvent[] {
+  const next = [...log, { ...ev, time }];
+  return next.length > max ? next.slice(next.length - max) : next;
 }

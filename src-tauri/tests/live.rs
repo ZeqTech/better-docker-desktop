@@ -199,6 +199,31 @@ fn volume_users_are_listed() {
 
 #[test]
 #[ignore]
+fn compose_project_stop_start_down_by_name() {
+    let dir = std::env::temp_dir().join("bdd-live-compose");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("compose.yaml");
+    std::fs::write(&file, format!("services:\n  one:\n    image: {}\n    command: sleep 60\n  two:\n    image: {}\n    command: sleep 60\n", local_image(), local_image())).unwrap();
+    let project = "bddlive";
+    docker::run(&["compose", "-p", project, "-f", file.to_str().unwrap(), "up", "-d"]).expect("compose up");
+
+    let running = || docker::run(&["ps", "--filter", &format!("label=com.docker.compose.project={project}"), "-q"]).unwrap();
+    assert_eq!(running().lines().count(), 2, "both services should be running");
+    docker::compose_project_action(project, "stop").unwrap();
+    assert_eq!(running().lines().count(), 0, "stop should stop every container");
+    docker::compose_project_action(project, "start").unwrap();
+    assert_eq!(running().lines().count(), 2);
+    docker::compose_project_action(project, "restart").unwrap();
+    assert_eq!(running().lines().count(), 2);
+    docker::compose_project_action(project, "down").unwrap();
+    let all = docker::run(&["ps", "-a", "--filter", &format!("label=com.docker.compose.project={project}"), "-q"]).unwrap();
+    assert!(all.is_empty(), "down should remove the containers");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+#[ignore]
 fn volumes_create_list_remove() {
     let name = "bdd-live-vol";
     let _ = docker::volume_remove(name, true);

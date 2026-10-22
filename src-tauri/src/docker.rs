@@ -393,6 +393,17 @@ pub fn container_action(id: &str, action: &str) -> Result<String, String> {
     }
 }
 
+/// Start, stop, restart or take down a whole Compose project by name (no compose file needed:
+/// Compose finds the project's containers through their labels). `down` removes containers and
+/// networks but keeps named volumes.
+pub fn compose_project_action(project: &str, action: &str) -> Result<String, String> {
+    let project = name_arg(project)?;
+    match action {
+        "start" | "stop" | "restart" | "down" => run(&["compose", "-p", project, action]),
+        _ => Err(format!("unknown project action: {action}")),
+    }
+}
+
 pub fn image_remove(image: &str, force: bool) -> Result<String, String> {
     let image = ref_arg(image)?;
     if force { run(&["rmi", "-f", image]) } else { run(&["rmi", image]) }
@@ -726,6 +737,13 @@ mod tests {
         assert!(stream_command("save", "app:1", "x.txt", 1, false, "").is_err());
         assert!(stream_command("load", "", "Z:\\missing.tar", 1, false, "").is_err());
         assert!(stream_command("save", "--bad", ok.to_str().unwrap(), 1, false, "").is_err());
+    }
+
+    #[test]
+    fn project_actions_are_whitelisted() {
+        assert!(compose_project_action("web", "rm").is_err());
+        assert!(compose_project_action("--all", "stop").is_err());
+        assert!(compose_project_action("a b", "stop").is_err());
     }
 
     #[test]

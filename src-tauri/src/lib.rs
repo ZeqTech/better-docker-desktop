@@ -119,6 +119,11 @@ async fn container_action(id: String, action: String) -> Result<String, String> 
 }
 
 #[tauri::command]
+async fn compose_project_action(project: String, action: String) -> Result<String, String> {
+    blocking(move || docker::compose_project_action(&project, &action)).await
+}
+
+#[tauri::command]
 async fn image_remove(image: String, force: bool) -> Result<String, String> {
     blocking(move || docker::image_remove(&image, force)).await
 }
@@ -238,6 +243,7 @@ pub fn run() {
             docker_status,
             start_engine,
             image_history,
+            compose_project_action,
             volume_containers,
             container_ls,
             container_copy_out,

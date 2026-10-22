@@ -197,8 +197,18 @@ export function ContainersView({ refreshKey, ticks }: { refreshKey: number; tick
                   items={items}
                   collapsed={collapsed.has(project)}
                   onToggle={() => setCollapsed((s) => { const n = new Set(s); if (!n.delete(project)) n.add(project); return n; })}
-                  onStart={() => void app.act(`Start ${project}`, () => Promise.all(items.map((c) => api.containerAction(c.id, "start"))), reload)}
-                  onStop={() => void app.act(`Stop ${project}`, () => Promise.all(items.map((c) => api.containerAction(c.id, "stop"))), reload)}
+                  onAction={async (a) => {
+                    if (a === "down") {
+                      const ok = await app.confirm({
+                        title: `Take down ${project}?`,
+                        body: <>Removes all {items.length} container{items.length === 1 ? "" : "s"} of <b>{project}</b> and its networks. Named volumes are kept.</>,
+                        label: "Take down",
+                        danger: true,
+                      });
+                      if (!ok) return;
+                    }
+                    await app.act(`${a === "down" ? "Take down" : a[0].toUpperCase() + a.slice(1)} ${project}`, () => api.projectAction(project, a), reload);
+                  }}
                   render={(c) => row(c, true)}
                 />
               ),
@@ -211,13 +221,12 @@ export function ContainersView({ refreshKey, ticks }: { refreshKey: number; tick
   );
 }
 
-function GroupRows({ project, items, collapsed, onToggle, onStart, onStop, render }: {
+function GroupRows({ project, items, collapsed, onToggle, onAction, render }: {
   project: string;
   items: Container[];
   collapsed: boolean;
   onToggle(): void;
-  onStart(): void;
-  onStop(): void;
+  onAction(a: "start" | "stop" | "restart" | "down"): void;
   render(c: Container): React.ReactNode;
 }) {
   const up = items.filter((c) => c.state === "running").length;
@@ -230,8 +239,10 @@ function GroupRows({ project, items, collapsed, onToggle, onStart, onStop, rende
           <small>{up}/{items.length} running</small>
         </td>
         <td className="actions">
-          <button className="icon" title="Start all" onClick={onStart}>▶</button>
-          <button className="icon" title="Stop all" onClick={onStop}>■</button>
+          <button className="icon" title="Start the project" onClick={() => onAction("start")}>▶</button>
+          <button className="icon" title="Stop the project" onClick={() => onAction("stop")}>■</button>
+          <button className="icon" title="Restart the project" onClick={() => onAction("restart")}>↻</button>
+          <button className="icon danger" title="Take the project down (removes its containers)" onClick={() => onAction("down")}>🗑</button>
         </td>
       </tr>
       {!collapsed && items.map(render)}

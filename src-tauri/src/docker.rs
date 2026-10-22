@@ -124,7 +124,11 @@ pub fn output_of(mut cmd: Command, limit: Duration, who: &str, cli: &str) -> Res
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("{cli} not found: {e}"))?;
+        .map_err(|e| {
+            let tried = cmd.get_program().to_string_lossy().into_owned();
+            let path = std::env::var("PATH").unwrap_or_default();
+            format!("{cli} not found: {e} (tried \"{tried}\"; PATH={path})")
+        })?;
     let drain = |pipe: Option<Box<dyn Read + Send>>| {
         std::thread::spawn(move || {
             let mut buf = Vec::new();
@@ -766,6 +770,18 @@ pub fn stream_command(
 
 #[cfg(test)]
 mod tests {
+    /// Regression: a Finder-launched app has PATH=/usr/bin:/bin:..., yet docker must still be found.
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn finds_docker_with_minimal_path() {
+        if !Path::new("/usr/local/bin/docker").exists() && !Path::new("/opt/homebrew/bin/docker").exists() {
+            return;
+        }
+        unsafe { std::env::set_var("PATH", "/usr/bin:/bin:/usr/sbin:/sbin") };
+        super::fix_path();
+        assert!(find_tool("docker").is_absolute(), "docker not resolved: {:?}", find_tool("docker"));
+    }
+
     use super::*;
 
     #[test]

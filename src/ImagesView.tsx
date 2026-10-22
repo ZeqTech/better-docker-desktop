@@ -1,0 +1,220 @@
+import { useMemo, useState } from "react";
+import { api, errorText } from "./api";
+import { formatSize, matches, sortRows, toContainers, toImages, type Image } from "./docker";
+import { InspectView } from "./InspectView";
+import { useSettings } from "./SettingsContext";
+import { pollMs } from "./settings";
+import { StreamModal } from "./StreamPanel";
+import { Empty, Modal, SearchBox, Summary, Th, useApp, useData, useSort } from "./ui";
+
+export function ImagesView({ refreshKey }: { refreshKey: number }) {
+  const app = useApp();
+  const images = useData(api.images);
+  const { settings } = useSettings();
+  const containers = useData(api.containers, pollMs(settings, 2));
+  const [query, setQuery] = useState("");
+  const [onlyUnused, setOnlyUnused] = useState(false);
+  const [pull, setPull] = useState<string | null>(null);
+  const [asking, setAsking] = useState<"pull" | null>(null);
+  const [runImage, setRunImage] = useState<Image | null>(null);
+  const [tagImage, setTagImage] = useState<Image | null>(null);
+  const [inspect, setInspect] = useState<Image | null>(null);
+  const { sort, dir, onSort } = useSort<Image>("ref");
+
+  const all = useMemo(
+    () => toImages(images.data ?? [], toContainers(containers.data ?? [])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [images.data, containers.data, refreshKey],
+  );
+  const shown = useMemo(
+    () => sortRows(all.filter((i) => (!onlyUnused || !i.inUse) && matches(query, i.ref, i.id)), sort, dir),
+    [all, query, onlyUnused, sort, dir],
+  );
+  const total = all.reduce((n, i) => n + i.size, 0);
+  const unused = all.filter((i) => !i.inUse);
+  const reload = () => {
+    void images.reload();
+    void containers.reload();
+  };
+
+  const remove = async (i: Image) => {
+    const ok = await app.confirm({
+      title: "Delete image?",
+      body: <>Image <b>{i.ref}</b> will be removed.{i.inUse && " It is used by a container, so Docker will refuse unless that container is deleted first."}</>,
+      label: "Delete",
+      danger: true,
+    });
+    if (ok) await app.act(`Delete ${i.ref}`, () => api.imageRemove(i.id, false), reload);
+  };
+
+  return (
+    <section className="view">
+      <header className="view-head">
+        <h1>Images</h1>
+        <span className="spacer" />
+        <button onClick={() => setAsking("pull")}>Pull image</button>
+        <button onClick={reload}>Refresh</button>
+      </header>
+      <Summary
+        items={[
+          { label: "Local images", value: String(all.length), sub: `${formatSize(total)} total` },
+          { label: "In use", value: String(all.length - unused.length) },
+          { label: "Unused", value: String(unused.length), sub: formatSize(unused.reduce((n, i) => n + i.size, 0)) },
+        ]}
+      />
+      <div className="toolbar">
+        <SearchBox value={query} onChange={setQuery} />
+        <label className="check"><input type="checkbox" checked={onlyUnused} onChange={(e) => setOnlyUnused(e.target.checked)} /> Unused only</label>
+        <span className="spacer" />
+        <button
+          className="danger"
+          disabled={unused.length === 0}
+          onClick={async () => {
+            const ok = await app.confirm({
+              title: "Clean up unused images?",
+              body: <>Removes every image not used by a container ({unused.length}, about {formatSize(unused.reduce((n, i) => n + i.size, 0))}).</>,
+              label: "Clean up",
+              danger: true,
+            });
+            if (ok) await app.act("Clean up images", () => api.prune("images"), reload);
+          }}
+        >
+          Clean up
+        </button>
+      </div>
+      {images.error && <div className="banner">{images.error}</div>}
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <Th<Image> label="Name" k="ref" sort={sort} dir={dir} onSort={onSort} />
+              <Th<Image> label="Status" k="inUse" sort={sort} dir={dir} onSort={onSort} />
+              <th>Created</th>
+              <Th<Image> label="Size" k="size" sort={sort} dir={dir} onSort={onSort} />
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((i) => (
+              <tr key={i.id + i.ref}>
+                <td>
+                  <button className="link" onClick={() => setInspect(i)}>{i.ref}</button>
+                  <small className="mono">{i.id.replace("sha256:", "").slice(0, 12)}</small>
+                </td>
+                <td><span className={`tag ${i.inUse ? "ok" : ""}`}>{i.inUse ? "In use" : "Unused"}</span></td>
+                <td className="muted">{i.created}</td>
+                <td className="num">{formatSize(i.size)}</td>
+                <td className="actions">
+                  <button className="icon" title="Run" onClick={() => setRunImage(i)}>▶</button>
+                  <button className="icon" title="Add tag" onClick={() => setTagImage(i)}>🏷</button>
+                  <button className="icon danger" title="Delete" onClick={() => void remove(i)}>🗑</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {shown.length === 0 && <Empty>{images.loading ? "Loading…" : all.length ? "No images match your filters." : "No images. Pull one to get started."}</Empty>}
+      </div>
+
+      {asking === "pull" && (
+        <TextPrompt
+          title="Pull image"
+          label="Image"
+          placeholder="e.g. nginx:latest"
+          action="Pull"
+          onClose={() => setAsking(null)}
+          onSubmit={(v) => {
+            setAsking(null);
+            setPull(v);
+          }}
+        />
+      )}
+      {pull && <StreamModal title={`Pulling ${pull}`} kind="pull" target={pull} onClose={() => { setPull(null); reload(); }} onEnd={reload} />}
+      {runImage && <RunDialog image={runImage} onClose={() => setRunImage(null)} onDone={reload} />}
+      {tagImage && (
+        <TextPrompt
+          title={`Add tag to ${tagImage.ref}`}
+          label="New tag"
+          placeholder="e.g. myapp:v2"
+          action="Tag"
+          onClose={() => setTagImage(null)}
+          onSubmit={(v) => {
+            const src = tagImage;
+            setTagImage(null);
+            void app.act(`Tag ${src.ref} as ${v}`, () => api.imageTag(src.id, v), reload);
+          }}
+        />
+      )}
+      {inspect && (
+        <Modal title={inspect.ref} onClose={() => setInspect(null)} wide>
+          <InspectView kind="image" target={inspect.id} />
+        </Modal>
+      )}
+    </section>
+  );
+}
+
+export function TextPrompt({ title, label, placeholder, action, onClose, onSubmit }: {
+  title: string;
+  label: string;
+  placeholder?: string;
+  action: string;
+  onClose(): void;
+  onSubmit(value: string): void;
+}) {
+  const [v, setV] = useState("");
+  const ok = v.trim().length > 0;
+  return (
+    <Modal title={title} onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ok) onSubmit(v.trim());
+        }}
+      >
+        <label>{label}<input autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} spellCheck={false} /></label>
+        <div className="form-actions">
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="submit" className="primary" disabled={!ok}>{action}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function RunDialog({ image, onClose, onDone }: { image: Image; onClose(): void; onDone(): void }) {
+  const app = useApp();
+  const [name, setName] = useState("");
+  const [port, setPort] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal title={`Run ${image.ref}`} onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          try {
+            await api.imageRun(image.id, name.trim(), port.trim());
+            app.notify(`Started ${image.ref}`);
+            onDone();
+            onClose();
+          } catch (x) {
+            setErr(errorText(x));
+            setBusy(false);
+          }
+        }}
+      >
+        <label>Container name (optional)<input autoFocus value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} /></label>
+        <label>Port mapping (optional)<input value={port} onChange={(e) => setPort(e.target.value)} placeholder="host:container, e.g. 8080:80" spellCheck={false} /></label>
+        {err && <pre className="logbox err">{err}</pre>}
+        <div className="form-actions">
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="submit" className="primary" disabled={busy}>Run</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

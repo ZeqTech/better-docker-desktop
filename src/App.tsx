@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "./api";
 import { BuildsView } from "./BuildsView";
+import { CleanupDialog } from "./CleanupDialog";
 import { ContainersView } from "./ContainersView";
 import { ImagesView } from "./ImagesView";
 import { SettingsView } from "./SettingsView";
@@ -37,6 +38,7 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [asking, setAsking] = useState<{ o: ConfirmOptions; done(v: boolean): void } | null>(null);
   const [starting, setStarting] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
   const status = useData(api.status, starting ? 2000 : 5000);
   const nextId = useRef(0);
   const autoTried = useRef(false);
@@ -128,6 +130,7 @@ export default function App() {
             ))}
           </nav>
           <div className="sidebar-foot">
+            <button onClick={() => setCleaning(true)} disabled={!up}>✦ Clean up…</button>
             <button className={page === "settings" ? "active" : ""} onClick={() => setPage("settings")}>⚙ Settings</button>
             <button onClick={() => { setRefreshKey((k) => k + 1); void status.reload(); }}>↻ Refresh all</button>
           </div>
@@ -167,6 +170,8 @@ export default function App() {
             <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>
           ))}
         </div>
+
+        {cleaning && <CleanupDialog onClose={() => setCleaning(false)} onDone={() => setRefreshKey((k) => k + 1)} />}
 
         {asking && (
           <Modal title={asking.o.title} onClose={() => answer(false)}>

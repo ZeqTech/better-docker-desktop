@@ -82,17 +82,12 @@ MAC_TARGET=aarch64-apple-darwin ./make.sh mac   # one architecture, about twice 
 
 ## Releasing
 
-Bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, commit, then push a tag that matches:
+Commit your changes, then:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+./make.sh release patch        # or minor, major, or an exact version like 0.3.0
 ```
 
-`.github/workflows/release.yml` builds Windows and macOS on GitHub's runners (running the tests first), then publishes the installers and a `SHA256SUMS.txt` as a GitHub Release. It refuses to run if the tag does not match the version in `tauri.conf.json`. It can also be started by hand from the Actions tab for an existing tag.
+It shows the plan and asks first (`-y` skips the question, `-n` only shows the plan). It then bumps the version in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `Cargo.lock`, commits "Release vX.Y.Z", tags it and pushes the branch and tag together. It stops if the working tree is dirty, the branch is behind the remote, or the tag already exists.
 
-Live tests run against your real engine and create disposable `bdd-live-*` containers and volumes, removing them afterwards. They need at least one image already present locally and never pull:
-
-```bash
-cd src-tauri && cargo test --test live -- --ignored --test-threads=1
-```
+The tag starts `.github/workflows/release.yml`, which builds Windows and macOS on GitHub's runners (running the tests first), then publishes the installers and a `SHA256SUMS.txt` as a GitHub Release. The workflow refuses to run if the tag does not match the version in `tauri.conf.json`. It can also be started by hand from the Actions tab for an existing tag.

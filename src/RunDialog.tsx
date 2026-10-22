@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { api, errorText } from "./api";
 import {
-  EMPTY_FORM, loadPresets, redactSecrets, savePresets, toOptions, upsertPreset, validateForm,
+  EMPTY_FORM, loadPresets, redactSecrets, riskyMounts, savePresets, toOptions, upsertPreset, validateForm,
   type Preset, type RunForm,
 } from "./runform";
 import { Modal, useApp } from "./ui";
@@ -15,6 +15,7 @@ export function RunDialog({ image, label, onClose, onDone }: { image: string; la
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const problems = useMemo(() => validateForm(form), [form]);
+  const risks = useMemo(() => riskyMounts(form.volumes), [form.volumes]);
   const set = <K extends keyof RunForm>(k: K, v: RunForm[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const savePreset = () => {
@@ -41,6 +42,24 @@ export function RunDialog({ image, label, onClose, onDone }: { image: string; la
         onSubmit={async (e) => {
           e.preventDefault();
           if (problems.length) return;
+          if (risks.length) {
+            const ok = await app.confirm({
+              title: "Run with risky mounts?",
+              body: (
+                <>
+                  {risks.map((r) => (
+                    <span key={r.volume} style={{ display: "block", marginBottom: 6 }}>
+                      <b>{r.volume}</b> {r.reason}.
+                    </span>
+                  ))}
+                  Only continue if you trust this image completely.
+                </>
+              ),
+              label: "Run anyway",
+              danger: true,
+            });
+            if (!ok) return;
+          }
           setBusy(true);
           try {
             await api.imageRun(toOptions(image, form));
@@ -86,6 +105,11 @@ export function RunDialog({ image, label, onClose, onDone }: { image: string; la
           <label>Volumes (one per line)<textarea value={form.volumes} onChange={(e) => set("volumes", e.target.value)} placeholder={"app-data:/var/lib/app\nC:\\src:/app:ro"} spellCheck={false} rows={3} /></label>
           <label>Command (optional, replaces the image default)<textarea value={form.command} onChange={(e) => set("command", e.target.value)} placeholder={'sh -c "echo hello"'} spellCheck={false} rows={3} /></label>
         </div>
+        {risks.length > 0 && (
+          <ul className="warnings">
+            {risks.map((r) => <li key={r.volume}><b>{r.volume}</b> {r.reason}.</li>)}
+          </ul>
+        )}
         {problems.length > 0 && <ul className="problems">{problems.map((p) => <li key={p}>{p}</li>)}</ul>}
         {err && <pre className="logbox err">{err}</pre>}
         <div className="form-actions">

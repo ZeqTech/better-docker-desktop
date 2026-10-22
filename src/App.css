@@ -309,3 +309,6 @@ tr.crash td { color: var(--bad); }
 .helper-prompt p { margin: 0; line-height: 1.5; }
 .helper-prompt code, .note code { background: var(--panel-hi); padding: 1px 6px; border-radius: 5px; font-size: 12.5px; }
 .note { margin: 0; font-size: 12.5px; }
+
+.warnings { margin: 0; padding: 8px 12px 8px 28px; color: var(--warn); background: rgba(233, 180, 76, 0.08); border: 1px solid rgba(233, 180, 76, 0.45); border-radius: 8px; font-size: 12.5px; }
+.warnings b { color: var(--fg); font-family: Consolas, "Cascadia Mono", monospace; font-weight: 600; }

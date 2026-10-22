@@ -51,6 +51,37 @@ export function validateForm(f: RunForm): string[] {
   return errs;
 }
 
+// ---- risky mounts -----------------------------------------------------------------------
+
+export interface MountRisk {
+  volume: string;
+  reason: string;
+}
+
+const SYSTEM_DIRS = ["/etc", "/root", "/proc", "/sys", "/dev", "/boot", "/usr", "/bin", "/sbin", "/lib", "/var/run", "c:/windows"];
+
+/**
+ * Mounts that give a container far more power than a data folder: the Docker socket or pipe (control
+ * of Docker, so of the whole machine), a whole drive or filesystem, or a writable system folder.
+ * They are allowed, but the user is asked to confirm.
+ */
+export function riskyMounts(volumesText: string): MountRisk[] {
+  const risks: MountRisk[] = [];
+  for (const line of lines(volumesText)) {
+    const readOnly = /:ro$/.test(line);
+    const parts = line.replace(/:(ro|rw)$/, "").split(":");
+    parts.pop(); // container path
+    const src = parts.join(":").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    if (/docker\.sock$/.test(src) || src.includes("pipe/docker_engine")) {
+      risks.push({ volume: line, reason: "gives the container control of Docker, and so of this computer" });
+    } else if (src === "" || /^[a-z]:$/.test(src) || /^\/mnt\/[a-z]$/.test(src) || /^\/host_mnt\/[a-z]$/.test(src)) {
+      risks.push({ volume: line, reason: "mounts a whole drive or the whole filesystem" });
+    } else if (!readOnly && SYSTEM_DIRS.includes(src)) {
+      risks.push({ volume: line, reason: "lets the container change a system folder" });
+    }
+  }
+  return risks;
+}
 // ---- secrets ----------------------------------------------------------------------------
 
 /** A value with credentials embedded in a URL, like postgres://user:password@host/db. */

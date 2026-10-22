@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FORM, lines, parsePresets, redactSecrets, toOptions, upsertPreset, validateForm, type RunForm } from "./runform";
+import { EMPTY_FORM, lines, parsePresets, redactSecrets, riskyMounts, toOptions, upsertPreset, validateForm, type RunForm } from "./runform";
 
 const form = (p: Partial<RunForm>): RunForm => ({ ...EMPTY_FORM, ...p });
 
@@ -69,5 +69,27 @@ describe("presets and secrets", () => {
   it("strips secrets from presets stored by older versions", () => {
     const raw = JSON.stringify([{ name: "db", form: { env: "POSTGRES_PASSWORD=old\nTZ=UTC" } }]);
     expect(parsePresets(raw)[0].form.env).toBe("POSTGRES_PASSWORD=\nTZ=UTC");
+  });
+});
+describe("riskyMounts", () => {
+  it("flags the docker socket and pipe, even read-only", () => {
+    expect(riskyMounts("/var/run/docker.sock:/var/run/docker.sock").map((r) => r.reason)[0]).toMatch(/control of Docker/);
+    expect(riskyMounts("/var/run/docker.sock:/s:ro")).toHaveLength(1);
+    expect(riskyMounts("\\\\.\\pipe\\docker_engine:\\\\.\\pipe\\docker_engine")).toHaveLength(1);
+  });
+  it("flags whole drives and the filesystem root", () => {
+    expect(riskyMounts("/:/host")[0].reason).toMatch(/whole drive/);
+    expect(riskyMounts("C:\\:/c")[0].reason).toMatch(/whole drive/);
+    expect(riskyMounts("C:/:/c")).toHaveLength(1);
+    expect(riskyMounts("/mnt/c:/c:ro")).toHaveLength(1);
+  });
+  it("flags writable system folders but not read-only ones", () => {
+    expect(riskyMounts("/etc:/e")[0].reason).toMatch(/system folder/);
+    expect(riskyMounts("/etc:/e:ro")).toEqual([]);
+    expect(riskyMounts("C:\\Windows:/w")).toHaveLength(1);
+  });
+  it("leaves ordinary mounts alone", () => {
+    expect(riskyMounts("data:/var/lib/data\nC:\\src\\app:/app\n/mnt/c/src:/app\n/home/me/project:/p")).toEqual([]);
+    expect(riskyMounts("")).toEqual([]);
   });
 });

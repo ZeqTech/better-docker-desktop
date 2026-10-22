@@ -63,8 +63,13 @@ export function useData<T>(fetcher: () => Promise<T>, interval = 0, trigger = 0)
     };
   }, [reload, interval]);
 
+  // Refetch when the trigger changes, but not for the value it had on mount (that is the first fetch).
+  const seen = useRef(trigger);
   useEffect(() => {
-    if (trigger) void reload();
+    if (trigger !== seen.current) {
+      seen.current = trigger;
+      void reload();
+    }
   }, [trigger, reload]);
 
   return { data, error, loading, reload };

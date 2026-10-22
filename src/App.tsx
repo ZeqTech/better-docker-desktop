@@ -79,7 +79,12 @@ export default function App() {
 
   const s = status.data;
   const up = !!s?.daemon_running;
-  const ticks = useEngineEvents(up, settings.notifyOnCrash);
+  const events = useEngineEvents(up, settings.notifyOnCrash);
+  // Docker events and "Refresh all" both make the lists refetch.
+  const ticks = useMemo(
+    () => ({ containers: events.containers + refreshKey, images: events.images + refreshKey, volumes: events.volumes + refreshKey }),
+    [events, refreshKey],
+  );
 
   const startEngine = useCallback(async () => {
     try {

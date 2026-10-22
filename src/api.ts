@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { parseLines } from "./docker";
+import type { RunOptions } from "./runform";
 
 export interface Status {
   docker_version: string | null;
@@ -47,7 +48,7 @@ export const api = {
   containerAction: (id: string, action: string) => invoke<string>("container_action", { id, action }),
   imageRemove: (image: string, force: boolean) => invoke<string>("image_remove", { image, force }),
   imageTag: (source: string, target: string) => invoke<string>("image_tag", { source, target }),
-  imageRun: (image: string, name: string, port: string) => invoke<string>("image_run", { image, name, port }),
+  imageRun: (opts: RunOptions) => invoke<string>("image_run", { opts }),
   prune: (kind: PruneKind) => invoke<string>("prune", { kind }),
   volumeCreate: (name: string) => invoke<string>("volume_create", { name }),
   volumeRemove: (name: string, force: boolean) => invoke<string>("volume_remove", { name, force }),

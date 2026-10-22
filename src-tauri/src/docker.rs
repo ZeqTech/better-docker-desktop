@@ -185,8 +185,9 @@ pub fn valid_since(s: &str) -> bool {
     !s.is_empty() && s.len() <= 40 && s.starts_with(|c: char| c.is_ascii_digit()) && s.chars().all(|c| c.is_ascii_digit() || matches!(c, '-' | ':' | '.' | 'T' | 'Z' | '+'))
 }
 
-/// `host:container` port mapping, e.g. `8080:80`.
+/// `host:container` port mapping, e.g. `8080:80` or `5353:53/udp`.
 pub fn valid_port_map(p: &str) -> bool {
+    let p = p.strip_suffix("/tcp").or_else(|| p.strip_suffix("/udp")).unwrap_or(p);
     let mut it = p.split(':');
     let ok = |s: Option<&str>| s.is_some_and(|s| !s.is_empty() && s.len() <= 5 && s.chars().all(|c| c.is_ascii_digit()));
     ok(it.next()) && ok(it.next()) && it.next().is_none()
@@ -317,21 +318,119 @@ pub fn image_tag(source: &str, target: &str) -> Result<String, String> {
     run(&["tag", ref_arg(source)?, ref_arg(target)?])
 }
 
-/// `docker run -d`, optionally named and with one `host:container` port mapping.
-pub fn image_run(image: &str, name: &str, port: &str) -> Result<String, String> {
-    let image = ref_arg(image)?;
-    let mut args: Vec<&str> = vec!["run", "-d"];
-    if !name.is_empty() {
-        args.extend(["--name", name_arg(name)?]);
+/// Everything the Run dialog can set. Lists hold one entry per line the user typed.
+#[derive(serde::Deserialize, Default, Debug)]
+pub struct RunOptions {
+    pub image: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub ports: Vec<String>,
+    #[serde(default)]
+    pub env: Vec<String>,
+    #[serde(default)]
+    pub volumes: Vec<String>,
+    #[serde(default)]
+    pub restart: String,
+    #[serde(default)]
+    pub command: String,
+}
+
+/// `KEY=VALUE` with a conventional variable name.
+pub fn valid_env(e: &str) -> bool {
+    let Some((k, v)) = e.split_once('=') else { return false };
+    !k.is_empty()
+        && !k.starts_with(|c: char| c.is_ascii_digit())
+        && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && !v.contains(['\n', '\r', '\0'])
+}
+
+/// `src:dst[:ro|rw]`. `src` is a volume name or a host path (it may contain a Windows drive colon).
+pub fn valid_volume(v: &str) -> bool {
+    if v.contains(['\n', '\r', '\0']) {
+        return false;
     }
-    if !port.is_empty() {
-        if !valid_port_map(port) {
-            return Err(format!("invalid port mapping: {port} (use host:container, e.g. 8080:80)"));
+    let mut parts: Vec<&str> = v.split(':').collect();
+    if matches!(parts.last(), Some(&"ro") | Some(&"rw")) {
+        parts.pop();
+    }
+    let Some(dst) = parts.pop() else { return false };
+    let src = parts.join(":");
+    dst.starts_with('/') && dst.len() > 1 && !src.is_empty() && !src.starts_with('-')
+}
+
+/// Split a command line on whitespace, honouring single and double quotes.
+pub fn split_command(s: &str) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    let mut has = false;
+    for c in s.chars() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => cur.push(c),
+            (None, '"' | '\'') => {
+                quote = Some(c);
+                has = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if has || !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                    has = false;
+                }
+            }
+            (None, c) => cur.push(c),
         }
-        args.extend(["-p", port]);
     }
-    args.push(image);
-    run(&args)
+    if quote.is_some() {
+        return Err("unclosed quote in the command".to_string());
+    }
+    if has || !cur.is_empty() {
+        out.push(cur);
+    }
+    Ok(out)
+}
+
+/// The full argv (after `docker`) for a validated run request.
+pub fn run_args(o: &RunOptions) -> Result<Vec<String>, String> {
+    let mut a: Vec<String> = vec!["run".into(), "-d".into()];
+    ref_arg(&o.image)?;
+    if !o.name.trim().is_empty() {
+        a.extend(["--name".into(), name_arg(o.name.trim())?.to_string()]);
+    }
+    for p in o.ports.iter().map(|p| p.trim()).filter(|p| !p.is_empty()) {
+        if !valid_port_map(p) {
+            return Err(format!("invalid port mapping: {p} (use host:container, e.g. 8080:80)"));
+        }
+        a.extend(["-p".into(), p.into()]);
+    }
+    for e in o.env.iter().map(|e| e.trim()).filter(|e| !e.is_empty()) {
+        if !valid_env(e) {
+            return Err(format!("invalid environment variable: {e} (use KEY=VALUE)"));
+        }
+        a.extend(["-e".into(), e.into()]);
+    }
+    for v in o.volumes.iter().map(|v| v.trim()).filter(|v| !v.is_empty()) {
+        if !valid_volume(v) {
+            return Err(format!("invalid volume: {v} (use name-or-path:/container/path[:ro])"));
+        }
+        a.extend(["-v".into(), v.into()]);
+    }
+    match o.restart.as_str() {
+        "" | "no" => {}
+        "always" | "unless-stopped" | "on-failure" => a.extend(["--restart".into(), o.restart.clone()]),
+        other => return Err(format!("unknown restart policy: {other}")),
+    }
+    a.push(o.image.clone());
+    a.extend(split_command(&o.command)?);
+    Ok(a)
+}
+
+/// `docker run -d` with the options from the Run dialog.
+pub fn image_run(o: &RunOptions) -> Result<String, String> {
+    let args = run_args(o)?;
+    let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    run(&refs)
 }
 
 pub fn prune_images() -> Result<String, String> {
@@ -446,6 +545,49 @@ mod tests {
         assert!(!valid_port_map("8080:80:1"));
         assert!(!valid_port_map("a:80"));
         assert!(!valid_port_map("123456:80"));
+    }
+
+    #[test]
+    fn env_volume_and_command_parsing() {
+        assert!(valid_env("DB_URL=postgres://u:p@h/db"));
+        assert!(valid_env("EMPTY="));
+        assert!(!valid_env("1BAD=x"));
+        assert!(!valid_env("NOEQUALS"));
+        assert!(!valid_env("A B=x"));
+        assert!(valid_volume("data:/var/lib/data"));
+        assert!(valid_volume("data:/var/lib/data:ro"));
+        assert!(valid_volume(r"C:\Users\me\app:/app"));
+        assert!(valid_volume(r"C:\Users\me\app:/app:rw"));
+        assert!(!valid_volume("data"));
+        assert!(!valid_volume("data:relative"));
+        assert!(!valid_volume("-v:/x"));
+        assert_eq!(split_command(r#"sh -c "echo hi there" 'a b'"#).unwrap(), vec!["sh", "-c", "echo hi there", "a b"]);
+        assert_eq!(split_command("  ").unwrap(), Vec::<String>::new());
+        assert!(split_command("echo \"oops").is_err());
+        assert!(valid_port_map("5353:53/udp"));
+    }
+
+    #[test]
+    fn run_args_are_assembled_in_order() {
+        let o = RunOptions {
+            image: "nginx:latest".into(),
+            name: "web".into(),
+            ports: vec!["8080:80".into(), " ".into()],
+            env: vec!["A=1".into()],
+            volumes: vec!["data:/d:ro".into()],
+            restart: "unless-stopped".into(),
+            command: "nginx -g 'daemon off;'".into(),
+        };
+        assert_eq!(
+            run_args(&o).unwrap(),
+            ["run", "-d", "--name", "web", "-p", "8080:80", "-e", "A=1", "-v", "data:/d:ro", "--restart", "unless-stopped", "nginx:latest", "nginx", "-g", "daemon off;"]
+        );
+        let bad = RunOptions { image: "x".into(), ports: vec!["nope".into()], ..Default::default() };
+        assert!(run_args(&bad).is_err());
+        let flag = RunOptions { image: "--privileged".into(), ..Default::default() };
+        assert!(run_args(&flag).is_err());
+        let policy = RunOptions { image: "x".into(), restart: "sometimes".into(), ..Default::default() };
+        assert!(run_args(&policy).is_err());
     }
 
     #[test]

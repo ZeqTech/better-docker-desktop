@@ -233,3 +233,12 @@ textarea.code.bad { border-color: var(--bad); }
 .a90 { color: #9b9ca5; } .ab { font-weight: 700; }
 .logbox.err { color: var(--bad); min-height: 0; flex: none; }
 .modal .logbox { min-height: 0; }
+
+/* run dialog */
+.run-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.run-form textarea, .form textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; outline: none; resize: vertical; font: 12.5px/1.45 Consolas, "Cascadia Mono", monospace; color: var(--fg); }
+.run-form textarea:focus { border-color: var(--accent-hi); }
+.preset-bar { display: flex; gap: 8px; align-items: center; }
+.preset-bar input { flex: 1; }
+.problems { margin: 0; padding: 8px 12px 8px 28px; color: var(--bad); background: rgba(255, 123, 123, 0.08); border: 1px solid rgba(255, 123, 123, 0.4); border-radius: 8px; font-size: 12.5px; }
+.modal.wide:has(.run-form) { height: auto; }

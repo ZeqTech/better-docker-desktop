@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { api, errorText } from "./api";
+import { api } from "./api";
 import { formatSize, matches, sortRows, toContainers, toImages, type Image } from "./docker";
 import { InspectView } from "./InspectView";
 import { useSettings } from "./SettingsContext";
 import { pollMs } from "./settings";
+import { RunDialog } from "./RunDialog";
 import { StreamModal } from "./StreamPanel";
 import { Empty, Modal, SearchBox, Summary, Th, useApp, useData, useSort } from "./ui";
 
@@ -130,7 +131,7 @@ export function ImagesView({ refreshKey }: { refreshKey: number }) {
         />
       )}
       {pull && <StreamModal title={`Pulling ${pull}`} kind="pull" target={pull} onClose={() => { setPull(null); reload(); }} onEnd={reload} />}
-      {runImage && <RunDialog image={runImage} onClose={() => setRunImage(null)} onDone={reload} />}
+      {runImage && <RunDialog image={runImage.id} label={runImage.ref} onClose={() => setRunImage(null)} onDone={reload} />}
       {tagImage && (
         <TextPrompt
           title={`Add tag to ${tagImage.ref}`}
@@ -177,42 +178,6 @@ export function TextPrompt({ title, label, placeholder, action, onClose, onSubmi
         <div className="form-actions">
           <button type="button" onClick={onClose}>Cancel</button>
           <button type="submit" className="primary" disabled={!ok}>{action}</button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function RunDialog({ image, onClose, onDone }: { image: Image; onClose(): void; onDone(): void }) {
-  const app = useApp();
-  const [name, setName] = useState("");
-  const [port, setPort] = useState("");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  return (
-    <Modal title={`Run ${image.ref}`} onClose={onClose}>
-      <form
-        className="form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          try {
-            await api.imageRun(image.id, name.trim(), port.trim());
-            app.notify(`Started ${image.ref}`);
-            onDone();
-            onClose();
-          } catch (x) {
-            setErr(errorText(x));
-            setBusy(false);
-          }
-        }}
-      >
-        <label>Container name (optional)<input autoFocus value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} /></label>
-        <label>Port mapping (optional)<input value={port} onChange={(e) => setPort(e.target.value)} placeholder="host:container, e.g. 8080:80" spellCheck={false} /></label>
-        {err && <pre className="logbox err">{err}</pre>}
-        <div className="form-actions">
-          <button type="button" onClick={onClose}>Cancel</button>
-          <button type="submit" className="primary" disabled={busy}>Run</button>
         </div>
       </form>
     </Modal>

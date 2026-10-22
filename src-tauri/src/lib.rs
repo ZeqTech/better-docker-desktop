@@ -103,8 +103,8 @@ async fn image_tag(source: String, target: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn image_run(image: String, name: String, port: String) -> Result<String, String> {
-    blocking(move || docker::image_run(&image, &name, &port)).await
+async fn image_run(opts: docker::RunOptions) -> Result<String, String> {
+    blocking(move || docker::image_run(&opts)).await
 }
 
 #[tauri::command]

@@ -236,6 +236,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(Streams::default())
         .manage(shell::Shells::default())
         .invoke_handler(tauri::generate_handler![

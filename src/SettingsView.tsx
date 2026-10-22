@@ -108,7 +108,6 @@ function General() {
 function DockerSettings({ onReconnect }: { onReconnect(): void }) {
   const { settings: s, update } = useSettings();
   const app = useApp();
-  const contexts = useData(api.contexts);
   const [path, setPath] = useState(s.dockerPath);
   const [pathErr, setPathErr] = useState("");
 
@@ -119,13 +118,10 @@ function DockerSettings({ onReconnect }: { onReconnect(): void }) {
       setPathErr("");
       app.notify(value.trim() ? "Using the selected Docker CLI" : "Using docker from PATH");
       onReconnect();
-      void contexts.reload();
     } catch (e) {
       setPathErr(errorText(e));
     }
   };
-
-  const current = (contexts.data ?? []).find((c) => c.Current === "true")?.Name;
 
   return (
     <>
@@ -141,18 +137,6 @@ function DockerSettings({ onReconnect }: { onReconnect(): void }) {
         </span>
       </Row>
       {pathErr && <div className="banner">{pathErr}</div>}
-      <Row title="Docker context" hint="Which engine the app talks to (local, remote host, ...). Changing it also changes it for the docker CLI.">
-        <select
-          value={current ?? ""}
-          disabled={!contexts.data?.length}
-          onChange={(e) =>
-            void app.act(`Switch to context ${e.target.value}`, () => api.useContext(e.target.value), () => { void contexts.reload(); onReconnect(); })
-          }
-        >
-          {(contexts.data ?? []).map((c) => <option key={c.Name} value={c.Name}>{c.Name}{c.Description ? ` – ${c.Description}` : ""}</option>)}
-          {!contexts.data?.length && <option value="">{contexts.error ? "Unavailable" : "Loading…"}</option>}
-        </select>
-      </Row>
       <EngineConfigEditor />
     </>
   );

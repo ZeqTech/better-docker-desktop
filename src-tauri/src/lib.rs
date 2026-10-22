@@ -48,16 +48,6 @@ fn set_docker_path(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn list_contexts() -> Result<String, String> {
-    blocking(docker::list_contexts).await
-}
-
-#[tauri::command]
-async fn use_context(name: String) -> Result<String, String> {
-    blocking(move || docker::use_context(&name)).await
-}
-
-#[tauri::command]
 async fn read_engine_config() -> Result<docker::EngineConfig, String> {
     blocking(docker::read_engine_config).await
 }
@@ -220,8 +210,6 @@ pub fn run() {
             docker_status,
             start_engine,
             set_docker_path,
-            list_contexts,
-            use_context,
             read_engine_config,
             write_engine_config,
             list_containers,

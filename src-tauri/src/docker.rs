@@ -233,14 +233,6 @@ pub fn build_history() -> Result<String, String> {
     run(&["buildx", "history", "ls", "--format", "json"])
 }
 
-pub fn list_contexts() -> Result<String, String> {
-    run(&["context", "ls", "--format", "{{json .}}"])
-}
-
-pub fn use_context(name: &str) -> Result<String, String> {
-    run(&["context", "use", name_arg(name)?])
-}
-
 // ---- engine configuration (daemon.json) ---------------------------------------------------
 
 #[derive(Serialize)]

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { api } from "./api";
 import { formatSize, matches, sortRows, toContainers, toImages, type Image } from "./docker";
-import { InspectView } from "./InspectView";
+import { ImageDetail } from "./ImageDetail";
 import { useSettings } from "./SettingsContext";
 import { pollMs } from "./settings";
 import type { Ticks } from "./events";
@@ -21,6 +22,7 @@ export function ImagesView({ refreshKey, ticks }: { refreshKey: number; ticks: T
   const [runImage, setRunImage] = useState<Image | null>(null);
   const [tagImage, setTagImage] = useState<Image | null>(null);
   const [inspect, setInspect] = useState<Image | null>(null);
+  const [job, setJob] = useState<{ title: string; kind: "save" | "load"; target: string; context: string } | null>(null);
   const { sort, dir, onSort } = useSort<Image>("ref");
 
   const all = useMemo(
@@ -39,6 +41,16 @@ export function ImagesView({ refreshKey, ticks }: { refreshKey: number; ticks: T
     void containers.reload();
   };
 
+  const exportImage = async (i: Image) => {
+    const file = await save({ defaultPath: `${i.ref.replace(/[:/]/g, "_")}.tar`, filters: [{ name: "Image archive", extensions: ["tar"] }] });
+    if (file) setJob({ title: `Exporting ${i.ref}`, kind: "save", target: i.ref, context: file });
+  };
+
+  const importImage = async () => {
+    const file = await open({ multiple: false, filters: [{ name: "Image archive", extensions: ["tar", "gz", "tgz"] }] });
+    if (typeof file === "string") setJob({ title: "Importing image", kind: "load", target: "", context: file });
+  };
+
   const remove = async (i: Image) => {
     const ok = await app.confirm({
       title: "Delete image?",
@@ -55,6 +67,7 @@ export function ImagesView({ refreshKey, ticks }: { refreshKey: number; ticks: T
         <h1>Images</h1>
         <span className="spacer" />
         <button onClick={() => setAsking("pull")}>Pull image</button>
+        <button onClick={() => void importImage()}>Import…</button>
         <button onClick={reload}>Refresh</button>
       </header>
       <Summary
@@ -109,6 +122,7 @@ export function ImagesView({ refreshKey, ticks }: { refreshKey: number; ticks: T
                 <td className="actions">
                   <button className="icon" title="Run" onClick={() => setRunImage(i)}>▶</button>
                   <button className="icon" title="Add tag" onClick={() => setTagImage(i)}>🏷</button>
+                  <button className="icon" title="Export to a .tar file" onClick={() => void exportImage(i)}>⭳</button>
                   <button className="icon danger" title="Delete" onClick={() => void remove(i)}>🗑</button>
                 </td>
               </tr>
@@ -147,11 +161,8 @@ export function ImagesView({ refreshKey, ticks }: { refreshKey: number; ticks: T
           }}
         />
       )}
-      {inspect && (
-        <Modal title={inspect.ref} onClose={() => setInspect(null)} wide>
-          <InspectView kind="image" target={inspect.id} />
-        </Modal>
-      )}
+      {inspect && <ImageDetail image={inspect} onClose={() => setInspect(null)} />}
+      {job && <StreamModal title={job.title} kind={job.kind} target={job.target} context={job.context} onClose={() => { setJob(null); reload(); }} onEnd={reload} />}
     </section>
   );
 }

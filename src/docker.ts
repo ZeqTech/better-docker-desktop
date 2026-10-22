@@ -276,3 +276,33 @@ export function groupByProject(list: Container[]): [string, Container[]][] {
   for (const c of list) map.set(c.project, [...(map.get(c.project) ?? []), c]);
   return [...map.entries()].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
 }
+
+// ---- image layers ---------------------------------------------------------------------
+
+export interface Layer {
+  id: string; // "" when the layer is not stored locally (<missing>)
+  command: string;
+  size: number;
+  created: string;
+}
+
+/** Turn Dockerfile history into something readable: drop the shell wrapper, collapse whitespace. */
+export function cleanLayerCommand(s: string): string {
+  return s
+    .replace(/^\/bin\/sh -c #\(nop\)\s*/, "")
+    .replace(/^\/bin\/sh -c\s+/, "RUN ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Rows of `docker history --format json`, oldest layer first (the order the image was built). */
+export function toLayers(rows: Row[]): Layer[] {
+  return rows
+    .map((r) => ({
+      id: (r.ID ?? "").startsWith("<") ? "" : shortId(r.ID ?? ""),
+      command: cleanLayerCommand(r.CreatedBy ?? ""),
+      size: parseSize(r.Size),
+      created: r.CreatedSince ?? "",
+    }))
+    .reverse();
+}

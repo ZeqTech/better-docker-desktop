@@ -245,6 +245,33 @@ pub fn disk_usage() -> Result<String, String> {
     run(&["system", "df", "-v", "--format", "{{json .}}"])
 }
 
+/// Layers of an image, newest first, as JSON lines.
+pub fn image_history(image: &str) -> Result<String, String> {
+    run(&["history", "--no-trunc", "--format", "{{json .}}", ref_arg(image)?])
+}
+
+/// A file path for `docker save`: its folder must exist and the name must end in `.tar`.
+pub fn validate_save_path(path: &str) -> Result<String, String> {
+    let p = Path::new(path);
+    let name = p.file_name().and_then(|n| n.to_str()).ok_or("choose a file name")?;
+    if !name.to_ascii_lowercase().ends_with(".tar") {
+        return Err("the export file must end in .tar".to_string());
+    }
+    let parent = p.parent().filter(|d| !d.as_os_str().is_empty()).ok_or("choose a folder for the file")?;
+    let dir = validate_dir(&parent.to_string_lossy())?;
+    Ok(Path::new(&dir).join(name).to_string_lossy().into_owned())
+}
+
+/// An existing image archive for `docker load`.
+pub fn validate_archive_path(path: &str) -> Result<String, String> {
+    let canon = host_path_exists(path)?;
+    let lower = canon.to_ascii_lowercase();
+    if !Path::new(&canon).is_file() || !(lower.ends_with(".tar") || lower.ends_with(".tar.gz") || lower.ends_with(".tgz")) {
+        return Err("choose a .tar, .tar.gz or .tgz image archive".to_string());
+    }
+    Ok(canon)
+}
+
 /// Build history; needs buildx 0.20+. An old buildx yields an error the UI shows as a hint.
 pub fn build_history() -> Result<String, String> {
     run(&["buildx", "history", "ls", "--format", "json"])
@@ -546,6 +573,15 @@ pub fn stream_command(
         }
         "pull" => command(&["pull", ref_arg(target)?]),
         "stats" => command(&["stats", "--format", "{{json .}}", name_arg(target)?]),
+        // Export an image to a tar file (context = destination file) or import one (context = archive).
+        "save" => {
+            let file = validate_save_path(context)?;
+            command(&["save", "-o", &file, ref_arg(target)?])
+        }
+        "load" => {
+            let file = validate_archive_path(context)?;
+            command(&["load", "-i", &file])
+        }
         // Lifecycle events only; health checks otherwise flood the stream with exec_* events.
         "events" => {
             const EVENTS: [&str; 18] = [
@@ -670,6 +706,20 @@ mod tests {
         assert!(container_ls("-x", "/").is_err());
         assert!(container_copy_in("web", "Z:\\definitely\\missing", "/tmp").is_err());
         assert!(container_copy_out("web", "/etc", "Z:\\definitely\\missing").is_err());
+    }
+
+    #[test]
+    fn save_and_load_paths_are_checked() {
+        let tmp = std::env::temp_dir();
+        let ok = tmp.join("export-test.tar");
+        assert!(validate_save_path(ok.to_str().unwrap()).is_ok());
+        assert!(validate_save_path(tmp.join("export-test.txt").to_str().unwrap()).is_err());
+        assert!(validate_save_path("Z:\\definitely\\missing\\x.tar").is_err());
+        assert!(validate_save_path("x.tar").is_err(), "a bare name has no folder");
+        assert!(validate_archive_path("Z:\\definitely\\missing.tar").is_err());
+        assert!(stream_command("save", "app:1", "x.txt", 1, false, "").is_err());
+        assert!(stream_command("load", "", "Z:\\missing.tar", 1, false, "").is_err());
+        assert!(stream_command("save", "--bad", ok.to_str().unwrap(), 1, false, "").is_err());
     }
 
     #[test]

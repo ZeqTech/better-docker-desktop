@@ -283,3 +283,8 @@ td.val { word-break: break-all; }
 .crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .crumbs button.link:disabled { color: var(--fg); text-decoration: none; opacity: 1; cursor: default; }
 .file-icon { display: inline-block; width: 22px; }
+
+/* image layers */
+.layer-cmd { position: relative; max-width: 560px; }
+.layer-cmd code { display: block; font: 12px/1.45 Consolas, "Cascadia Mono", monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; z-index: 1; }
+.layer-bar { position: absolute; left: 0; bottom: 3px; height: 3px; background: var(--accent-hi); border-radius: 2px; opacity: 0.8; }

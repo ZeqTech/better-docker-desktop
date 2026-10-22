@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionsFor, formatDuration, formatSize, groupByProject, hostPorts, labelValue, matches,
-  parseDiskUsage, parseLines, parseSize, shortId, sortRows, stripAnsi, timeAgo, toBuilds, toContainers, toImages,
+  actionsFor, cleanLayerCommand, formatDuration, formatSize, groupByProject, hostPorts, labelValue, matches,
+  parseDiskUsage, parseLines, parseSize, shortId, sortRows, stripAnsi, timeAgo, toBuilds, toContainers, toImages, toLayers,
   type Row,
 } from "./docker";
 
@@ -134,5 +134,22 @@ describe("table helpers", () => {
   });
   it("shortens ids", () => {
     expect(shortId("sha256:0123456789abcdef")).toBe("0123456789ab");
+  });
+});
+
+describe("image layers", () => {
+  it("cleans the build command", () => {
+    expect(cleanLayerCommand("/bin/sh -c #(nop)  CMD [\"postgres\"]")).toBe('CMD ["postgres"]');
+    expect(cleanLayerCommand("/bin/sh -c apk add   --no-cache curl")).toBe("RUN apk add --no-cache curl");
+    expect(cleanLayerCommand("EXPOSE map[5432/tcp:{}]")).toBe("EXPOSE map[5432/tcp:{}]");
+  });
+  it("orders layers oldest first and hides missing ids", () => {
+    const layers = toLayers([
+      { ID: "sha256:79bd7c99e923aaaa", CreatedBy: "CMD x", Size: "0B", CreatedSince: "4 weeks ago" },
+      { ID: "<missing>", CreatedBy: "/bin/sh -c apk add curl", Size: "12.5MB", CreatedSince: "4 weeks ago" },
+    ]);
+    expect(layers.map((l) => l.command)).toEqual(["RUN apk add curl", "CMD x"]);
+    expect(layers[0]).toMatchObject({ id: "", size: 12.5e6 });
+    expect(layers[1].id).toBe("79bd7c99e923");
   });
 });

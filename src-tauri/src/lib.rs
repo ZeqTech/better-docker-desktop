@@ -74,6 +74,11 @@ async fn container_copy_in(container: String, src: String, dest: String) -> Resu
 }
 
 #[tauri::command]
+async fn image_history(image: String) -> Result<String, String> {
+    blocking(move || docker::image_history(&image)).await
+}
+
+#[tauri::command]
 async fn list_containers() -> Result<String, String> {
     blocking(docker::list_containers).await
 }
@@ -227,6 +232,7 @@ pub fn run() {
             app_version,
             docker_status,
             start_engine,
+            image_history,
             container_ls,
             container_copy_out,
             container_copy_in,

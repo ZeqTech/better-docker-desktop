@@ -156,6 +156,28 @@ fn container_files_list_and_copy_round_trip() {
 
 #[test]
 #[ignore]
+fn image_history_save_and_load() {
+    let image = local_image();
+    let history = docker::image_history(&image).expect("history");
+    assert!(history.lines().count() > 0 && history.contains("CreatedBy"));
+
+    let dir = std::env::temp_dir().join("bdd-live-save");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let tar = dir.join("image.tar");
+    let tar_s = tar.to_str().unwrap();
+
+    let status = docker::stream_command("save", &image, tar_s, 1, false, "").unwrap().status().unwrap();
+    assert!(status.success(), "docker save failed");
+    assert!(std::fs::metadata(&tar).unwrap().len() > 1000, "archive is empty");
+
+    let status = docker::stream_command("load", "", tar_s, 1, false, "").unwrap().status().unwrap();
+    assert!(status.success(), "docker load failed");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+#[ignore]
 fn volumes_create_list_remove() {
     let name = "bdd-live-vol";
     let _ = docker::volume_remove(name, true);

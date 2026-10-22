@@ -28,6 +28,7 @@ export type PruneKind = "images" | "containers" | "volumes" | "buildcache";
 export const api = {
   status: () => invoke<Status>("docker_status"),
   appVersion: () => invoke<string>("app_version"),
+  imageHistory: (image: string) => invoke<string>("image_history", { image }),
   containerLs: (container: string, path: string) => invoke<string>("container_ls", { container, path }),
   copyOut: (container: string, path: string, dest: string) => invoke<string>("container_copy_out", { container, path, dest }),
   copyIn: (container: string, src: string, dest: string) => invoke<string>("container_copy_in", { container, src, dest }),
@@ -58,7 +59,7 @@ export const api = {
   buildHistoryRemove: (reference: string) => invoke<string>("build_history_remove", { reference }),
 };
 
-export type StreamKind = "logs" | "pull" | "build" | "events" | "stats";
+export type StreamKind = "logs" | "pull" | "build" | "events" | "stats" | "save" | "load";
 
 export interface StreamHandlers {
   onLine(line: string): void;

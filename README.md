@@ -45,6 +45,12 @@ The window updates instantly from `docker events`, with polling as a fallback. I
 - Names, image references, paths, ports, environment variables and volumes are validated in Rust and passed to Docker as separate arguments, never through a shell.
 - Destructive actions ask first (switchable in Settings). Unused-volume clean-up is unchecked by default because it deletes data for good.
 - Editing the engine config can stop Docker from starting if the JSON is wrong. The previous file is kept as `daemon.json.bak`.
+- The window runs under a strict content security policy (no inline scripts, no remote connections), so even injected content could not reach the backend commands or the network.
+- Saved run presets never keep secret values: environment variables that look like secrets (by name, or a URL with a password in it) are saved empty and entered again each time.
+- A custom Docker CLI path must be the real `docker.exe`; scripts such as `docker.bat` are refused.
+- The helper image for volume browsing is pinned by digest, so the tag cannot be swapped for different content. Update the digest in `src/VolumeFiles.tsx` to move to a newer Alpine.
+- The Run dialog asks before starting a container that mounts the Docker socket, a whole drive or a writable system folder.
+- Not covered: the installer is not code-signed (Windows SmartScreen will warn), and dependencies are not audited automatically. Run `pnpm audit` and `cargo audit` now and then.
 
 ## Development
 

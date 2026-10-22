@@ -5,7 +5,7 @@ import {
   CELL, HEAD, NODE_GAP, detailLevel, fitLabel, fitView, layoutMap, loadColor, nodeMemory, podKey, zoomAt,
   type NodeBox, type NodeMemory, type View,
 } from "./clustermap";
-import { TextPanel, type KubeSel } from "./KubeViews";
+import { PodTabs, TextPanel, type KubeSel } from "./KubeViews";
 import { useSettings } from "./SettingsContext";
 import { MAP_REFRESH_CHOICES } from "./settings";
 import { Empty, useData } from "./ui";
@@ -66,6 +66,7 @@ export function KubeMap({ kube }: { kube: KubeSel }) {
   const [fitted, setFitted] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [sel, setSel] = useState<Selection>(null);
+  const [wide, setWide] = useState(false);
   const moved = useRef(false);
   const minK = useRef(0.05);
 
@@ -211,9 +212,9 @@ export function KubeMap({ kube }: { kube: KubeSel }) {
         </div>
         <div className="kmap-hint">Scroll to zoom, drag to pan, click a node or pod.</div>
         {(selPod || selNode) && (
-          <aside className="kmap-panel">
-            <div className="toolbar"><span className="spacer" /><button className="icon" onClick={() => setSel(null)} aria-label="Close">✕</button></div>
-            {selPod && <PodPanel kube={kube} pod={selPod} usage={podUsage?.get(podKey(selPod)) ?? null} />}
+          <aside className={`kmap-panel${wide ? " wide" : ""}`}>
+            <div className="toolbar"><span className="spacer" /><button className="icon" onClick={() => setWide((w) => !w)} title={wide ? "Narrow panel" : "Widen panel"} aria-label="Resize panel">{wide ? "⇥" : "⇤"}</button><button className="icon" onClick={() => setSel(null)} aria-label="Close">✕</button></div>
+            {selPod && <PodPanel kube={kube} pod={selPod} usage={podUsage?.get(podKey(selPod)) ?? null} onChanged={() => void data.reload()} onRemoved={() => setSel(null)} />}
             {selNode && <NodePanel kube={kube} node={selNode} pods={pods.filter((p) => p.node === selNode.name)} mem={nodeMemory(selNode, pods.filter((p) => p.node === selNode.name), nodeUsage, podUsage)} />}
           </aside>
         )}
@@ -304,24 +305,20 @@ function PodCellView({ pod, x, y, level, selected, dim, lit, mem }: { mem: strin
   );
 }
 
-function PodPanel({ kube, pod, usage }: { kube: KubeSel; pod: KubePod; usage: number | null }) {
-  const [describe, setDescribe] = useState(false);
-  return (
-    <>
-      <h2>{pod.name}</h2>
+function PodPanel({ kube, pod, usage, onChanged, onRemoved }: { kube: KubeSel; pod: KubePod; usage: number | null; onChanged(): void; onRemoved(): void }) {
+  const overview = (
+    <div className="details">
       <dl className="kv">
         {([["Namespace", pod.namespace], ["Status", pod.status], ["Ready", pod.ready], ["Restarts", String(pod.restarts)], ["Node", pod.node || "-"], ["IP", pod.ip || "-"], ["Age", pod.age], ["Memory in use", usage === null ? "no metrics" : formatBytes(usage)], ["Memory request", pod.memRequest ? formatBytes(pod.memRequest) : "none"], ["Memory limit", pod.memLimit ? formatBytes(pod.memLimit) : "none"]] as const).map(([k, v]) => (
           <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
         ))}
       </dl>
-      <table className="mini">
-        <thead><tr><th>Container</th><th>State</th><th className="num">Restarts</th></tr></thead>
-        <tbody>
-          {pod.containers.map((c) => <tr key={c.name}><td>{c.name}</td><td>{c.state}</td><td className="num">{c.restarts}</td></tr>)}
-        </tbody>
-      </table>
-      <button onClick={() => setDescribe((d) => !d)}>{describe ? "Hide describe" : "Describe"}</button>
-      {describe && <TextPanel key={podKey(pod)} load={() => api.kubeShow(kube.context, "describe", "pods", pod.name, pod.namespace)} />}
+    </div>
+  );
+  return (
+    <>
+      <h2>{pod.name}</h2>
+      <PodTabs key={podKey(pod)} kube={kube} pod={pod} overview={overview} onChanged={onChanged} onRemoved={onRemoved} />
     </>
   );
 }

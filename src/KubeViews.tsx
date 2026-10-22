@@ -164,14 +164,49 @@ export function PodsView({ kube }: { kube: KubeSel }) {
 }
 
 function PodDetail({ kube, pod, onBack, onChanged }: { kube: KubeSel; pod: KubePod; onBack(): void; onChanged(): void }) {
+  return (
+    <section className="view">
+      <header className="view-head">
+        <button onClick={onBack}>← Pods</button>
+        <StatusDot state={podState(pod.status)} />
+        <h1>{pod.name}</h1>
+        <small className="muted">{pod.namespace}</small>
+      </header>
+      <div className="meta">
+        <span>Status <b>{pod.status}</b></span><span>Ready <b>{pod.ready}</b></span><span>Restarts <b>{pod.restarts}</b></span>
+        <span>Node <b>{pod.node || "-"}</b></span><span>IP <b>{pod.ip || "-"}</b></span>
+      </div>
+      <PodTabs kube={kube} pod={pod} onChanged={onChanged} onRemoved={onBack} />
+    </section>
+  );
+}
+
+type PodTab = "overview" | "logs" | "shell" | "containers" | "events" | "describe" | "yaml";
+
+/**
+ * Everything you can do with one pod: actions, then tabs for logs, shell, containers, events,
+ * describe and YAML. With `overview` it gets a first tab holding that content (the map's panel).
+ */
+export function PodTabs({ kube, pod, overview, onChanged, onRemoved }: {
+  kube: KubeSel;
+  pod: KubePod;
+  overview?: ReactNode;
+  onChanged(): void;
+  onRemoved(): void;
+}) {
   const app = useApp();
-  const [tab, setTab] = useState<"logs" | "shell" | "containers" | "describe" | "yaml">("logs");
+  const [tab, setTab] = useState<PodTab>(overview ? "overview" : "logs");
   const [shellOpened, setShellOpened] = useState(false);
   const [container, setContainer] = useState(pod.containers[0]?.name ?? "");
   const running = pod.status === "Running";
+  const kc = `kubectl --context ${kube.context} -n ${pod.namespace}`;
+  const copy = (text: string, what: string) => {
+    void navigator.clipboard?.writeText(text);
+    app.notify(`Copied ${what}`);
+  };
   const remove = async () => {
     if (!(await confirmChange(app, kube, `Delete pod ${pod.name}?`, <>Pod <b>{pod.namespace}/{pod.name}</b> is deleted; its controller may recreate it.</>, "Delete"))) return;
-    if (await app.act(`Delete ${pod.name}`, () => api.kubeAct(kube.context, "delete", "pods", pod.name, pod.namespace), onChanged)) onBack();
+    if (await app.act(`Delete ${pod.name}`, () => api.kubeAct(kube.context, "delete", "pods", pod.name, pod.namespace), onChanged)) onRemoved();
   };
   const picker = pod.containers.length > 1 && (
     <div className="toolbar">
@@ -182,26 +217,22 @@ function PodDetail({ kube, pod, onBack, onChanged }: { kube: KubeSel; pod: KubeP
       </label>
     </div>
   );
+  const tabs: [string, string][] = [
+    ...(overview ? [["overview", "Overview"] as [string, string]] : []),
+    ["logs", "Logs"], ["shell", "Shell"], ["containers", "Containers"], ["events", "Events"], ["describe", "Describe"], ["yaml", "YAML"],
+  ];
   return (
-    <section className="view">
-      <header className="view-head">
-        <button onClick={onBack}>← Pods</button>
-        <StatusDot state={podState(pod.status)} />
-        <h1>{pod.name}</h1>
-        <small className="muted">{pod.namespace}</small>
+    <>
+      <div className="toolbar">
+        <button onClick={() => copy(pod.name, "pod name")}>Copy name</button>
+        <button onClick={() => copy(`${kc} logs -f ${pod.name}${container ? ` -c ${container}` : ""}`, "logs command")} title="Copy a kubectl logs command">Copy logs cmd</button>
+        <button onClick={() => copy(`${kc} exec -it ${pod.name}${container ? ` -c ${container}` : ""} -- sh`, "exec command")} title="Copy a kubectl exec command">Copy exec cmd</button>
         <span className="spacer" />
         <button className="danger" onClick={() => void remove()}>Delete</button>
-      </header>
-      <div className="meta">
-        <span>Status <b>{pod.status}</b></span><span>Ready <b>{pod.ready}</b></span><span>Restarts <b>{pod.restarts}</b></span>
-        <span>Node <b>{pod.node || "-"}</b></span><span>IP <b>{pod.ip || "-"}</b></span>
       </div>
-      <Tabs
-        tabs={[["logs", "Logs"], ["shell", "Shell"], ["containers", "Containers"], ["describe", "Describe"], ["yaml", "YAML"]]}
-        tab={tab}
-        onTab={(t) => { setTab(t as typeof tab); if (t === "shell") setShellOpened(true); }}
-      />
+      <Tabs tabs={tabs} tab={tab} onTab={(t) => { setTab(t as PodTab); if (t === "shell") setShellOpened(true); }} />
       <div className="tab-body">
+        {tab === "overview" && overview}
         {tab === "logs" && (<>{picker}{container && <StreamPanel key={container} kind="kubelogs" target={`${pod.namespace}/${pod.name}/${container}`} context={kube.context} />}</>)}
         {shellOpened && running && container && (
           <div className="term-wrap" style={{ display: tab === "shell" ? "flex" : "none" }}>
@@ -222,10 +253,31 @@ function PodDetail({ kube, pod, onBack, onChanged }: { kube: KubeSel; pod: KubeP
             </table>
           </div>
         )}
+        {tab === "events" && <PodEvents kube={kube} pod={pod} />}
         {tab === "describe" && <TextPanel load={() => api.kubeShow(kube.context, "describe", "pods", pod.name, pod.namespace)} />}
         {tab === "yaml" && <TextPanel load={() => api.kubeShow(kube.context, "yaml", "pods", pod.name, pod.namespace)} />}
       </div>
-    </section>
+    </>
+  );
+}
+
+/** Events of the pod's namespace, narrowed to this pod. Shows why it restarts or will not start. */
+function PodEvents({ kube, pod }: { kube: KubeSel; pod: KubePod }) {
+  const data = useData(async () => toEvents(parseItems(await api.kubeGet(kube.context, "events", pod.namespace))).filter((e) => e.object === `pod/${pod.name}`));
+  if (data.error) return <Empty>{data.error}</Empty>;
+  if (!data.data) return <Empty>Loading…</Empty>;
+  if (data.data.length === 0) return <Empty>No events for this pod (Kubernetes keeps them for about an hour).</Empty>;
+  return (
+    <div className="details">
+      <table className="mini">
+        <thead><tr><th>Last seen</th><th>Type</th><th>Reason</th><th>Message</th><th className="num">Count</th></tr></thead>
+        <tbody>
+          {data.data.map((e, i) => (
+            <tr key={i}><td className="muted">{e.last}</td><td><span className={`tag ${e.type === "Warning" ? "bad" : ""}`}>{e.type}</span></td><td>{e.reason}</td><td>{e.message}</td><td className="num">{e.count}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

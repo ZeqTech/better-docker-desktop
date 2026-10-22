@@ -347,3 +347,6 @@ pre.logbox { margin: 0; white-space: pre-wrap; word-break: break-all; font-famil
 .km-label.sub { fill: var(--muted); font-weight: 400; }
 .km-label.halo { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
 .km-bar-bg { fill: rgba(255, 255, 255, 0.12); }
+.kmap-panel.wide { width: 75%; max-width: 75%; }
+.kmap-panel .tab-body { flex: 1; min-height: 260px; }
+.kmap-panel .toolbar { flex-wrap: wrap; }

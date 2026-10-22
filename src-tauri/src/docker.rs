@@ -19,19 +19,22 @@ pub struct DockerStatus {
 /// Docker CLI chosen in Settings; `None` means "docker" from PATH.
 static DOCKER_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 
-/// Set (or with an empty string, clear) the Docker CLI to use. Must be an existing file named docker.
+/// A custom Docker CLI must be an existing file called `docker.exe` (Windows) or `docker` (elsewhere).
+/// Scripts such as docker.bat, docker.cmd or docker.ps1 are refused: the app runs this path directly.
+pub fn check_docker_path(path: &str) -> Result<PathBuf, String> {
+    let p = PathBuf::from(path.trim());
+    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let expected = if cfg!(windows) { "docker.exe" } else { "docker" };
+    let name_ok = if cfg!(windows) { name.eq_ignore_ascii_case(expected) } else { name == expected };
+    if !name_ok || !p.is_file() {
+        return Err(format!("{} must be an existing {expected} executable", p.display()));
+    }
+    Ok(p)
+}
+
+/// Set (or with an empty string, clear) the Docker CLI to use.
 pub fn set_docker_path(path: &str) -> Result<(), String> {
-    let path = path.trim();
-    let new = if path.is_empty() {
-        None
-    } else {
-        let p = PathBuf::from(path);
-        let stem_ok = p.file_stem().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("docker"));
-        if !p.is_file() || !stem_ok {
-            return Err(format!("{path} is not a docker executable"));
-        }
-        Some(p)
-    };
+    let new = if path.trim().is_empty() { None } else { Some(check_docker_path(path)?) };
     *DOCKER_PATH.lock().unwrap() = new;
     Ok(())
 }
@@ -877,5 +880,30 @@ mod tests {
     fn docker_path_must_be_a_docker_file() {
         assert!(set_docker_path("Z:\\missing\\docker.exe").is_err());
         assert!(set_docker_path("   ").is_ok()); // clears
+    }
+
+    #[test]
+    fn docker_path_refuses_scripts_and_lookalikes() {
+        let dir = std::env::temp_dir().join("bdd-docker-path-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let make = |name: &str| {
+            let p = dir.join(name);
+            std::fs::write(&p, b"").unwrap();
+            p.to_string_lossy().into_owned()
+        };
+        let good = if cfg!(windows) { "docker.exe" } else { "docker" };
+        assert!(check_docker_path(&make(good)).is_ok());
+        for bad in ["docker.bat", "docker.cmd", "docker.ps1", "docker.exe.txt", "mydocker.exe", "docker-compose.exe", "notdocker"] {
+            assert!(check_docker_path(&make(bad)).is_err(), "{bad} must be refused");
+        }
+        if cfg!(windows) {
+            std::fs::remove_file(dir.join("docker.exe")).unwrap();
+            assert!(check_docker_path(&make("Docker.EXE")).is_ok(), "the name check ignores case on Windows");
+        } else {
+            assert!(check_docker_path(&make("docker")).is_ok());
+        }
+        assert!(check_docker_path(&dir.to_string_lossy()).is_err(), "a folder is not a program");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

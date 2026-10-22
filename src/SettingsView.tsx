@@ -130,11 +130,12 @@ function DockerSettings({ onReconnect }: { onReconnect(): void }) {
   return (
     <>
       <h2>Docker</h2>
-      <Row title="Docker CLI" hint="Leave empty to use docker from your PATH.">
+      <Row title="Docker CLI" hint="Leave empty to use docker from your PATH. Must be the docker executable itself (docker.exe on Windows), not a script.">
         <span className="path-edit">
           <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="docker (from PATH)" spellCheck={false} />
           <button onClick={async () => {
-            const picked = await open({ multiple: false, filters: [{ name: "docker", extensions: ["exe", ""] }] });
+            const windows = /Windows/i.test(navigator.userAgent);
+            const picked = await open({ multiple: false, filters: windows ? [{ name: "docker.exe", extensions: ["exe"] }] : undefined });
             if (typeof picked === "string") { setPath(picked); void applyPath(picked); }
           }}>Browse…</button>
           <button className="primary" disabled={path.trim() === s.dockerPath} onClick={() => void applyPath(path)}>Apply</button>

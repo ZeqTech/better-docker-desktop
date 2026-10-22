@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import {
   actionsFor, groupByProject, hostPorts, matches, sortRows, toContainers,
   type Container, type ContainerAction,
 } from "./docker";
+import { DetailsTab, EnvTab, MountsTab } from "./ContainerTabs";
 import { InspectView } from "./InspectView";
+import { parseInspect } from "./inspect";
 import { StreamPanel } from "./StreamPanel";
 import { Empty, SearchBox, StatusDot, Summary, Th, useApp, useData, useSort } from "./ui";
 import { openUrl } from "./open";
@@ -233,12 +235,21 @@ function GroupRows({ project, items, collapsed, onToggle, onStart, onStop, rende
   );
 }
 
+const TAB_LABEL = { logs: "Logs", details: "Details", env: "Environment", mounts: "Mounts", inspect: "Inspect", stats: "Stats" } as const;
+
 function ContainerDetail({ container: c, onBack, onAction }: {
   container: Container;
   onBack(): void;
   onAction(c: Container, a: ContainerAction): Promise<void>;
 }) {
-  const [tab, setTab] = useState<"logs" | "inspect" | "stats">("logs");
+  const [tab, setTab] = useState<"logs" | "details" | "env" | "mounts" | "inspect" | "stats">("logs");
+  const insp = useData(() => api.inspect("container", c.id));
+  const details = useMemo(() => (insp.data ? parseInspect(insp.data) : null), [insp.data]);
+  // Re-read after the container starts, stops or restarts.
+  useEffect(() => {
+    void insp.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [c.state, c.status]);
   return (
     <section className="view">
       <header className="view-head">
@@ -260,12 +271,15 @@ function ContainerDetail({ container: c, onBack, onAction }: {
         {c.ports && <span>Ports <b>{c.ports}</b></span>}
       </div>
       <div className="tabs">
-        {(["logs", "inspect", "stats"] as const).map((t) => (
-          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
+        {(["logs", "details", "env", "mounts", "inspect", "stats"] as const).map((t) => (
+          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>
         ))}
       </div>
       <div className="tab-body">
         {tab === "logs" && <StreamPanel kind="logs" target={c.id} reattach active={c.state === "running"} />}
+        {tab === "details" && (details ? <DetailsTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
+        {tab === "env" && (details ? <EnvTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
+        {tab === "mounts" && (details ? <MountsTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
         {tab === "inspect" && <InspectView kind="container" target={c.id} />}
         {tab === "stats" && (
           <Summary

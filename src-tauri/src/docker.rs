@@ -494,6 +494,7 @@ pub fn stream_command(
             command(&args)
         }
         "pull" => command(&["pull", ref_arg(target)?]),
+        "stats" => command(&["stats", "--format", "{{json .}}", name_arg(target)?]),
         // Lifecycle events only; health checks otherwise flood the stream with exec_* events.
         "events" => {
             const EVENTS: [&str; 18] = [

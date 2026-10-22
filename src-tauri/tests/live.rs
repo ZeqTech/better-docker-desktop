@@ -93,6 +93,41 @@ fn events_stream_reports_container_lifecycle() {
 
 #[test]
 #[ignore]
+fn stats_stream_emits_json_samples() {
+    use std::io::{BufRead, BufReader};
+    use std::time::{Duration, Instant};
+
+    let name = "bdd-live-stats";
+    cleanup(name);
+    let o = docker::RunOptions { image: local_image(), name: name.into(), command: "sleep 60".into(), ..Default::default() };
+    docker::image_run(&o).expect("run");
+    let mut child = docker::stream_command("stats", name, "", 500, true, "").unwrap().spawn().unwrap();
+    let out = child.stdout.take().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for l in BufReader::new(out).lines().map_while(Result::ok) {
+            if tx.send(l).is_err() {
+                break;
+            }
+        }
+    });
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mut got = None;
+    while Instant::now() < deadline && got.is_none() {
+        if let Ok(l) = rx.recv_timeout(Duration::from_secs(1)) {
+            if l.contains("\"CPUPerc\"") {
+                got = Some(l);
+            }
+        }
+    }
+    let _ = child.kill();
+    cleanup(name);
+    let line = got.expect("no stats sample within 20s");
+    assert!(line.contains("\"MemUsage\"") && line.contains(name));
+}
+
+#[test]
+#[ignore]
 fn volumes_create_list_remove() {
     let name = "bdd-live-vol";
     let _ = docker::volume_remove(name, true);

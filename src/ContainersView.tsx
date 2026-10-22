@@ -6,6 +6,7 @@ import {
 } from "./docker";
 import { DetailsTab, EnvTab, MountsTab } from "./ContainerTabs";
 import { InspectView } from "./InspectView";
+import { StatsTab } from "./StatsTab";
 import { parseInspect } from "./inspect";
 import { StreamPanel } from "./StreamPanel";
 import { Empty, SearchBox, StatusDot, Summary, Th, useApp, useData, useSort } from "./ui";
@@ -282,15 +283,7 @@ function ContainerDetail({ container: c, onBack, onAction }: {
         {tab === "env" && (details ? <EnvTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
         {tab === "mounts" && (details ? <MountsTab d={details} /> : <Empty>{insp.error ?? "Loading…"}</Empty>)}
         {tab === "inspect" && <InspectView kind="container" target={c.id} />}
-        {tab === "stats" && (
-          <Summary
-            items={[
-              { label: "CPU", value: c.cpu === null ? "-" : `${c.cpu.toFixed(2)}%` },
-              { label: "Memory", value: c.mem || "-" },
-              { label: "State", value: c.state },
-            ]}
-          />
-        )}
+        {tab === "stats" && <StatsTab container={c.id} running={c.state === "running"} />}
       </div>
     </section>
   );

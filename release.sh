@@ -60,17 +60,17 @@ if [ "$YES" != 1 ]; then
   case "$ans" in y|Y|yes) ;; *) echo "Cancelled."; exit 1 ;; esac
 fi
 
-# Replace only the app's own version line in each file.
-sed -i.bak -E '0,/^  "version": "[^"]*"/s//  "version": "'"$NEXT"'"/' package.json
-sed -i.bak -E '0,/^  "version": "[^"]*"/s//  "version": "'"$NEXT"'"/' src-tauri/tauri.conf.json
-sed -i.bak -E '0,/^version = "[^"]*"/s//version = "'"$NEXT"'"/' src-tauri/Cargo.toml
+# Replace only the app's own (first) version line in each file. perl instead of sed because
+# BSD sed (macOS) has no "0,/re/" first-match address.
+export NEXT
+perl -0pi -e 's/^(  "version": ")[^"]*"/$1$ENV{NEXT}"/m' package.json src-tauri/tauri.conf.json
+perl -0pi -e 's/^version = "[^"]*"/version = "$ENV{NEXT}"/m' src-tauri/Cargo.toml
 if [ -f src-tauri/Cargo.lock ]; then
   awk -v v="$NEXT" '
     prev == "name = \"better-docker-desktop\"" && /^version = / { print "version = \"" v "\""; prev = $0; next }
     { print; prev = $0 }
   ' src-tauri/Cargo.lock > src-tauri/Cargo.lock.new && mv src-tauri/Cargo.lock.new src-tauri/Cargo.lock
 fi
-rm -f package.json.bak src-tauri/tauri.conf.json.bak src-tauri/Cargo.toml.bak
 
 # Fail before committing if any file did not take the new version.
 for f in package.json src-tauri/tauri.conf.json; do

@@ -5,8 +5,13 @@ import { describePreview } from "./files";
 import { StreamModal } from "./StreamPanel";
 import { Empty, Modal, useData } from "./ui";
 
-/** The tiny image the app offers to pull when no alpine or busybox image exists locally. */
-const HELPER_TO_PULL = "alpine:3";
+/**
+ * The tiny image the app offers to pull when no alpine or busybox image exists locally. It is pinned
+ * by digest so a changed tag cannot swap in different content. To update it, pull `alpine:3`, read the
+ * new digest from `docker images --digests alpine`, and paste it here.
+ */
+const HELPER_TO_PULL = "alpine:3@sha256:c6b073f8e9e58d881f6ffba6ebf3b9ebd60b9e7d6e8337018c0e68bb5c356873";
+const HELPER_LABEL = "alpine:3";
 
 /**
  * Read-only browsing of a volume. Docker cannot list a volume directly, so a throwaway container
@@ -28,12 +33,12 @@ export function VolumeFiles({ volume }: { volume: string }) {
           Docker cannot list a volume directly. To read this one the app runs a short-lived container from a tiny image
           (<code>alpine</code> or <code>busybox</code>), with the volume mounted read-only, no network and no write access.
         </p>
-        <p className="muted">None is on this computer yet. Pulling <code>{HELPER_TO_PULL}</code> downloads about 8 MB once.</p>
-        <button className="primary" onClick={() => setPulling(true)}>Pull {HELPER_TO_PULL}</button>
+        <p className="muted">None is on this computer yet. Pulling <code>{HELPER_LABEL}</code> (a fixed, verified version) downloads about 8 MB once.</p>
+        <button className="primary" onClick={() => setPulling(true)}>Pull {HELPER_LABEL}</button>
         {helper.error && <div className="banner">{helper.error}</div>}
         {pulling && (
           <StreamModal
-            title={`Pulling ${HELPER_TO_PULL}`}
+            title={`Pulling ${HELPER_LABEL}`}
             kind="pull"
             target={HELPER_TO_PULL}
             onClose={() => {

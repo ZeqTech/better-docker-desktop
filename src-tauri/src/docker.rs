@@ -347,10 +347,31 @@ pub fn is_helper_image(image: &str) -> bool {
     matches!(repo.rsplit('/').next(), Some("alpine") | Some("busybox"))
 }
 
+/// Pick a usable helper reference from `docker images` lines of `repository|tag|digest`. A tagged
+/// image is referenced as `repo:tag`; an image pulled by digest has no tag and is `repo@digest`.
+pub fn pick_helper(listing: &str) -> Option<String> {
+    listing.lines().find_map(|line| {
+        let mut f = line.split('|');
+        let (repo, tag, digest) = (f.next()?, f.next()?, f.next().unwrap_or(""));
+        if !is_helper_image(repo) || repo.contains("<none>") {
+            return None;
+        }
+        let reference = if tag != "<none>" && !tag.is_empty() {
+            format!("{repo}:{tag}")
+        } else if digest.starts_with("sha256:") {
+            format!("{repo}@{digest}")
+        } else {
+            return None;
+        };
+        valid_ref(&reference).then_some(reference)
+    })
+}
+
 /// A local alpine or busybox image to read volumes with, if one exists. Never pulls.
 pub fn volume_helper_image() -> Result<Option<String>, String> {
-    let out = run(&["images", "--format", "{{.Repository}}:{{.Tag}}"])?;
-    Ok(out.lines().find(|l| !l.contains("<none>") && is_helper_image(l)).map(str::to_string))
+    // --digests is needed for the Digest field to be filled in.
+    let out = run(&["images", "--digests", "--format", "{{.Repository}}|{{.Tag}}|{{.Digest}}"])?;
+    Ok(pick_helper(&out))
 }
 
 /// A path inside the volume: absolute, no control characters and no `..` segments.
@@ -798,6 +819,20 @@ mod tests {
         assert!(stream_command("save", "app:1", "x.txt", 1, false, "").is_err());
         assert!(stream_command("load", "", "Z:\\missing.tar", 1, false, "").is_err());
         assert!(stream_command("save", "--bad", ok.to_str().unwrap(), 1, false, "").is_err());
+    }
+
+    #[test]
+    fn helper_images_are_found_by_tag_or_digest() {
+        let digest = "sha256:c6b073f8e9e58d881f6ffba6ebf3b9ebd60b9e7d6e8337018c0e68bb5c356873";
+        let tagged = "postgres|17|<none>\nalpine|3|<none>\n";
+        assert_eq!(pick_helper(tagged).as_deref(), Some("alpine:3"));
+        let pinned = format!("postgres|17|<none>\nalpine|<none>|{digest}\n");
+        assert_eq!(pick_helper(&pinned), Some(format!("alpine@{digest}")));
+        assert_eq!(pick_helper("alpine|<none>|<none>\npostgres|17|<none>"), None, "untagged and undigested cannot be referenced");
+        assert_eq!(pick_helper("evil/alpine-clone|1|<none>"), None);
+        assert_eq!(pick_helper(""), None);
+        // a digest reference is accepted for running
+        assert!(volume_run_args("data", &format!("alpine@{digest}"), "ls", &["-la"], "/").is_ok());
     }
 
     #[test]

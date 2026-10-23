@@ -62,6 +62,23 @@ pub fn find_tool(name: &str) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(name))
 }
 
+/// PATH and KUBECONFIG as the user's login shell sees them (`~/.zprofile`, `~/.zshrc`), so tools
+/// installed by gcloud, asdf, nvm and the like, and a custom kubeconfig, reach kubectl and its auth
+/// plugins (`gke-gcloud-auth-plugin`). Markers drop any noise the rc files print. `None` when the
+/// shell is missing or too slow.
+#[cfg(unix)]
+fn login_shell_env() -> (Option<std::ffi::OsString>, Option<std::ffi::OsString>) {
+    use std::os::unix::ffi::OsStringExt;
+    let shell = std::env::var_os("SHELL").filter(|s| Path::new(s).is_file()).unwrap_or_else(|| "/bin/zsh".into());
+    let mut cmd = Command::new(shell);
+    cmd.args(["-l", "-i", "-c", r#"printf '\n__BDD__%s\n__BDD__%s\n' "$PATH" "$KUBECONFIG""#]);
+    let Ok(out) = output_of(cmd, Duration::from_secs(4), "login shell", "login shell") else { return (None, None) };
+    let mut vals = out.stdout.split(|b| *b == b'\n').filter_map(|l| l.strip_prefix(b"__BDD__")).map(|v| v.to_vec());
+    let mut next = || vals.next().filter(|v| !v.is_empty()).map(std::ffi::OsString::from_vec);
+    let path = next();
+    (path, next())
+}
+
 /// Apps launched from Finder inherit a minimal PATH (/usr/bin:/bin:...), so `docker`, its
 /// credential helpers and `kubectl` are not found even though they work in a terminal. Add the
 /// usual install locations (Docker Desktop, Homebrew, Rancher/Podman-style user dirs).
@@ -69,6 +86,18 @@ pub fn fix_path() {
     #[cfg(unix)]
     {
         let mut dirs: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
+        let (shell_path, shell_kubeconfig) = login_shell_env();
+        for d in shell_path.iter().flat_map(std::env::split_paths) {
+            if !d.as_os_str().is_empty() && !dirs.contains(&d) {
+                dirs.push(d);
+            }
+        }
+        if std::env::var_os("KUBECONFIG").is_none() {
+            if let Some(k) = shell_kubeconfig {
+                // SAFETY: called once at startup, before any other thread reads the environment.
+                unsafe { std::env::set_var("KUBECONFIG", k) };
+            }
+        }
         let mut extra = vec![
             PathBuf::from("/usr/local/bin"),
             PathBuf::from("/opt/homebrew/bin"),
@@ -78,7 +107,10 @@ pub fn fix_path() {
             let home = PathBuf::from(home);
             extra.push(home.join(".docker/bin"));
             extra.push(home.join(".rd/bin"));
+            extra.push(home.join("google-cloud-sdk/bin"));
         }
+        extra.push(PathBuf::from("/opt/homebrew/share/google-cloud-sdk/bin"));
+        extra.push(PathBuf::from("/usr/local/share/google-cloud-sdk/bin"));
         for d in extra {
             if d.is_dir() && !dirs.contains(&d) {
                 dirs.push(d);
@@ -783,6 +815,14 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn login_shell_env_reports_its_path() {
+        let (path, _) = login_shell_env();
+        let path = path.expect("login shell PATH");
+        assert!(std::env::split_paths(&path).count() > 1, "PATH={path:?}");
+    }
 
     #[test]
     fn names_reject_flags_and_separators() {

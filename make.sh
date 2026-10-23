@@ -25,7 +25,9 @@ case "$1" in
                     "$0" mac || exit 1
                 fi
     ;;
-    dev)        pnpm tauri build --bundles app -- --profile fast ;;
+    dev)        pnpm tauri build --bundles app -- --profile fast
+                open "/Users/zeqtech/Documents/Programming/rea/better-docker-desktop/src-tauri/target/fast/bundle/"
+    ;;
     "")         exec "$SHELL_BIN" ./build.sh ;;
     *)          echo "Usage: $0 [win|mac|all]" >&2; exit 2 ;;
 esac

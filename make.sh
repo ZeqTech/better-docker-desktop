@@ -60,7 +60,7 @@ case "$1" in
                 fi
     ;;
     dev)        pnpm tauri build --bundles app -- --profile fast
-                open "/Users/zeqtech/Documents/Programming/rea/better-docker-desktop/src-tauri/target/fast/bundle/"
+                open "./src-tauri/target/fast/bundle/"
     ;;
     "")         exec "$SHELL_BIN" ./build.sh ;;
     *)          echo "Usage: $0 [win|mac|all]" >&2; exit 2 ;;

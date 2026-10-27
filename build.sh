@@ -74,7 +74,7 @@ build_mac() {
   # half the time; the default is a universal binary that runs on both.
   MAC_TARGET="${MAC_TARGET:-universal-apple-darwin}"
   echo "==> Building macOS ($MAC_TARGET, dmg)"
-  rustup target add aarch64-apple-darwin x86_64-apple-darwin
+  rustup target add aarch64-apple-darwin
   "$NPM" exec tauri build --target "$MAC_TARGET" --bundles dmg
   M=src-tauri/target/$MAC_TARGET/release/bundle
   cp "$M"/dmg/*.dmg dist/

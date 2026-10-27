@@ -6,6 +6,7 @@
 #   ./make.sh all        win, plus mac when running on a Mac
 #   ./make.sh dev        run the app in Tauri dev mode (hot reload, no full build)
 #   ./make.sh release <patch|minor|major|X.Y.Z>  bump version, tag and push (starts the GitHub release)
+#   ./make.sh uninstall  quit the app and delete it plus its settings and caches (macOS), for a fresh install
 #   ./make.sh makefile   regenerate ./Makefile from the commands in the case block below
 # Env: MAC_TARGET=aarch64-apple-darwin builds one Mac architecture only; SKIP_TESTS=0 runs tests first.
 cd "$(dirname "${BASH_SOURCE[0]:-$0}")" || exit 1
@@ -48,8 +49,34 @@ gen_makefile() {
     echo "Wrote $(pwd)/Makefile"
 }
 
+# Remove the installed app and everything it stored, so the next install starts clean.
+# Leaves Docker, kubeconfig and build output (dist/, target/) alone.
+uninstall_app() {
+    [ "$(uname -s)" = "Darwin" ] || { echo "uninstall is macOS only" >&2; exit 1; }
+    local id="com.rea.betterdockerdesktop" name="Better Docker Desktop" lib="$HOME/Library"
+    pkill -x "$name" 2>/dev/null || true
+    pkill -x better-docker-desktop 2>/dev/null || true
+    local paths=(
+        "/Applications/$name.app" "$HOME/Applications/$name.app"
+        "$lib/Application Support/$id" "$lib/Application Support/better-docker-desktop"
+        "$lib/Caches/$id" "$lib/Caches/better-docker-desktop"
+        "$lib/WebKit/$id" "$lib/WebKit/better-docker-desktop"
+        "$lib/Preferences/$id.plist" "$lib/Saved Application State/$id.savedState"
+        "$lib/HTTPStorages/$id" "$lib/Logs/$id"
+        "./src-tauri/target/fast/bundle/"
+        "./src-tauri/target/aarch64-apple-darwin/release/bundle/"
+        "./src-tauri/target/universal-apple-darwin/release/bundle/"
+    )
+    local p
+    for p in "${paths[@]}"; do
+        if [ -e "$p" ]; then rm -rf "$p" && echo "removed $p"; fi
+    done
+    echo "Uninstalled $name."
+}
+
 case "$1" in
     makefile)   gen_makefile ;;
+    uninstall)  uninstall_app ;;
     release)    shift; exec "$SHELL_BIN" ./release.sh "$@" ;;
     win)        exec "$SHELL_BIN" ./build.sh "$1" && exec "dist\Better Docker Desktop.exe" ;;
     mac)        MAC_TARGET=aarch64-apple-darwin exec "$SHELL_BIN" ./build.sh "$1" && exec "dist/Better Docker Desktop.app/Contents/MacOS/Better Docker Desktop" ;;

@@ -3,8 +3,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorText, type Status } from "./api";
 import { useSettings } from "./SettingsContext";
 import {
-  ACCENTS, LOG_TAIL_CHOICES, MAP_REFRESH_CHOICES, PAGES, REFRESH_CHOICES, checkEngineJson,
-  type AccentId, type PageId,
+  THEMES, THEME_IDS, accentFor, accentIds, LOG_TAIL_CHOICES, MAP_REFRESH_CHOICES, PAGES, REFRESH_CHOICES, checkEngineJson,
+  type PageId,
 } from "./settings";
 import { SHORTCUT_HELP } from "./shortcuts";
 import { useApp, useData } from "./ui";
@@ -208,15 +208,30 @@ function Appearance() {
   return (
     <>
       <h2>Appearance</h2>
-      <Row title="Accent colour" hint="The whole app stays dark red; this changes the highlight shade.">
+      <Row title="Theme" hint="Ruby red, emerald green or sapphire blue. Each has its own accent shades.">
         <span className="swatches">
-          {(Object.keys(ACCENTS) as AccentId[]).map((id) => (
+          {THEME_IDS.map((id) => (
+            <button
+              key={id}
+              className={`swatch${s.theme === id ? " on" : ""}`}
+              style={{ background: `linear-gradient(135deg, ${THEMES[id].vars["--bar-a"]}, ${THEMES[id].vars["--bg"]})` }}
+              title={THEMES[id].label}
+              aria-label={THEMES[id].label}
+              aria-pressed={s.theme === id}
+              onClick={() => update({ theme: id, accent: accentIds(id)[0] })}
+            />
+          ))}
+        </span>
+      </Row>
+      <Row title="Accent colour" hint={`Highlight shade for the ${THEMES[s.theme].label} theme.`}>
+        <span className="swatches">
+          {accentIds(s.theme).map((id) => (
             <button
               key={id}
               className={`swatch${s.accent === id ? " on" : ""}`}
-              style={{ background: ACCENTS[id].accent }}
-              title={ACCENTS[id].label}
-              aria-label={ACCENTS[id].label}
+              style={{ background: accentFor(s.theme, id).accent }}
+              title={accentFor(s.theme, id).label}
+              aria-label={accentFor(s.theme, id).label}
               aria-pressed={s.accent === id}
               onClick={() => update({ accent: id })}
             />

@@ -1,4 +1,4 @@
-/* Burgundy theme. One dark palette: the whole app is dark red regardless of the OS setting. */
+/* Dark themes (ruby default, emerald, sapphire). Values here are the ruby defaults; SettingsContext overrides them per theme. */
 :root {
   color-scheme: dark;
   --bg: #1c0a10;
@@ -14,6 +14,10 @@
   --ok: #67d49a;
   --warn: #e9b44c;
   --bad: #ff7b7b;
+  --bar-a: #7a1429;
+  --bar-b: #5a0f1f;
+  --logo-dark: #6b1022;
+  --code-bg: #10050a;
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   color: var(--fg);
@@ -32,12 +36,12 @@ button, input, select { font: inherit; color: inherit; }
 .app { display: grid; grid-template: minmax(0, 1fr) 28px / 210px minmax(0, 1fr); height: 100vh; }
 .sidebar { background: var(--sidebar); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 12px 10px; gap: 14px; }
 main { overflow: auto; min-width: 0; padding: 0 22px 14px; display: flex; flex-direction: column; }
-.statusbar { grid-column: 1 / -1; display: flex; gap: 18px; align-items: center; padding: 0 14px; background: var(--accent); background: linear-gradient(90deg, #7a1429, #5a0f1f); font-size: 12px; border-top: 1px solid var(--line); }
+.statusbar { grid-column: 1 / -1; display: flex; gap: 18px; align-items: center; padding: 0 14px; background: var(--accent); background: linear-gradient(90deg, var(--bar-a), var(--bar-b)); font-size: 12px; border-top: 1px solid var(--line); }
 .statusbar .engine { display: flex; align-items: center; gap: 6px; font-weight: 600; }
 
 /* sidebar */
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; line-height: 1.15; padding: 4px 6px 10px; border-bottom: 1px solid var(--line); }
-.logo { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 16px; background: linear-gradient(135deg, var(--accent-hi), #6b1022); color: #fff; flex: none; }
+.logo { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 16px; background: linear-gradient(135deg, var(--accent-hi), var(--logo-dark)); color: #fff; flex: none; }
 nav { display: flex; flex-direction: column; gap: 2px; }
 nav button { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: none; text-align: left; cursor: pointer; color: var(--muted); }
 nav button:hover { background: var(--panel); color: var(--fg); }
@@ -108,7 +112,12 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
 tr.sel { background: var(--accent-soft); }
 tr.group td { background: rgba(179, 32, 63, 0.1); }
 tr.group small { display: inline; margin-left: 10px; }
-td.indent { padding-left: 30px; }
+tr td.indent { padding-left: 46px; position: relative; }
+tr td.indent::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; border-left: 1px solid var(--muted); opacity: 0.4; }
+tr td.indent::after { content: ""; position: absolute; left: 22px; top: 50%; width: 14px; border-top: 1px solid var(--muted); opacity: 0.4; }
+tr.stopped { color: var(--muted); }
+tr.stopped .dot { background: var(--muted); box-shadow: none; }
+tr.stopped .link { color: var(--muted); }
 td.num, th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 th:has(+ th) { }
 td.actions { white-space: nowrap; text-align: right; width: 1%; }
@@ -190,7 +199,7 @@ button.swatch.on { border-color: #fff; box-shadow: 0 0 0 2px var(--bg) inset; }
 .path-edit input { width: 280px; }
 .engine-config { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .engine-config h3 { margin: 0; font-size: 15px; }
-textarea.code { min-height: 220px; resize: vertical; background: #10050a; color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: 12.5px/1.5 Consolas, "Cascadia Mono", monospace; outline: none; }
+textarea.code { min-height: 220px; resize: vertical; background: var(--code-bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: 12.5px/1.5 Consolas, "Cascadia Mono", monospace; outline: none; }
 textarea.code:focus { border-color: var(--accent-hi); }
 textarea.code.bad { border-color: var(--bad); }
 .field-error { color: var(--bad); font-size: 12.5px; }
@@ -317,10 +326,10 @@ tr.crash td { color: var(--bad); }
 .sidebar { overflow-y: auto; gap: 8px; }
 .nav-group { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px 0; }
 .nav-note { font-size: 12px; color: var(--muted); padding: 4px 8px; }
-.kube-pickers { display: flex; flex-direction: column; gap: 6px; padding: 0 2px; }
-.kube-pickers label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); }
-.kube-pickers select { min-width: 0; width: 100%; font-size: 12px; padding: 4px 6px; color: var(--fg); }
-.kube-pickers select.prod { border-color: var(--accent-hi); }
+.kube-bar { display: flex; gap: 12px; align-items: flex-end; padding: 8px 16px; border-bottom: 1px solid var(--border, rgba(128,128,128,.25)); }
+.kube-bar label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); }
+.kube-bar select { min-width: 180px; font-size: 12px; padding: 4px 6px; color: var(--fg); }
+.kube-bar select.prod { border-color: var(--accent-hi); }
 .kube-page { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 pre.logbox { margin: 0; white-space: pre-wrap; word-break: break-all; font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; }
 
@@ -338,7 +347,7 @@ pre.logbox { margin: 0; white-space: pre-wrap; word-break: break-all; font-famil
 .km-podtext { fill: #fff; pointer-events: none; font-family: Consolas, "Cascadia Mono", monospace; }
 .kmap-tools { position: absolute; left: 10px; top: 10px; display: flex; gap: 6px; align-items: center; }
 .kmap-tools .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--muted); }
-.kmap-panel { position: absolute; right: 0; top: 0; bottom: 0; width: 380px; max-width: 70%; background: var(--sidebar); border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow: auto; }
+.kmap-panel { position: absolute; right: 0; top: 0; bottom: 0; max-width: calc(100% - 120px); background: var(--sidebar); border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 12px 16px; overflow: hidden; box-shadow: -8px 0 24px rgba(0,0,0,0.35); }
 .kmap-panel h2 { margin: 0; font-size: 16px; word-break: break-all; }
 .kmap-panel .stream { min-height: 220px; flex: 1; }
 .kmap-hint { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: var(--muted); pointer-events: none; }
@@ -347,6 +356,21 @@ pre.logbox { margin: 0; white-space: pre-wrap; word-break: break-all; font-famil
 .km-label.sub { fill: var(--muted); font-weight: 400; }
 .km-label.halo { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
 .km-bar-bg { fill: rgba(255, 255, 255, 0.12); }
-.kmap-panel.wide { width: 75%; max-width: 75%; }
-.kmap-panel .tab-body { flex: 1; min-height: 260px; }
+.kmap-panel .tab-body { flex: 1; min-height: 0; overflow: auto; }
 .kmap-panel .toolbar { flex-wrap: wrap; }
+.kmap-panel .tabs { overflow-x: auto; flex: none; scrollbar-width: none; }
+.kmap-panel .tabs button { padding: 6px 11px; white-space: nowrap; font-size: 13px; }
+.kmap-panel .details { overflow: auto; }
+.kmap-resize { position: absolute; left: -3px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 3; }
+.kmap-resize:hover, .kmap-resize:active { background: var(--accent-soft); }
+.panel-head { display: flex; align-items: center; gap: 8px; flex: none; }
+.panel-head h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: normal; }
+.pod-actions { flex: none; gap: 8px; }
+.menu { position: relative; }
+.menu summary { list-style: none; cursor: pointer; padding: 6px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+.menu summary::-webkit-details-marker { display: none; }
+.menu summary::after { content: " \25BE"; color: var(--muted); }
+.menu-pop { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 210px; display: flex; flex-direction: column; background: var(--sidebar); border: 1px solid var(--line); border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.menu-pop button { border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: 6px; }
+.menu-pop button:hover { background: var(--accent-soft); }
+tr.group { cursor: pointer; }

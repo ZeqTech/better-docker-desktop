@@ -114,6 +114,15 @@ export function StreamPanel({ kind, target, context = "", onEnd, reattach = fals
     };
   }, [kind, target, context, run, logTail, reattach]);
 
+  // The container stopped: end the follow right away and keep the lines already shown.
+  useEffect(() => {
+    if (!reattach || active || state !== "running") return;
+    stop.current?.();
+    stop.current = null;
+    since.current = new Date(Date.now() - 1000).toISOString();
+    setState("waiting");
+  }, [reattach, active, state]);
+
   // After the stream ended, reconnect shortly after the container is running again.
   useEffect(() => {
     if (state !== "waiting" || !active) return;
@@ -128,7 +137,9 @@ export function StreamPanel({ kind, target, context = "", onEnd, reattach = fals
   return (
     <div className="stream">
       <div className="toolbar">
-        <span className={`pill ${state}`}>{LABEL[state]}</span>
+        <span className={`pill ${state}`}>
+          {reattach && state === "waiting" ? (active ? "Reconnecting…" : "Container stopped") : LABEL[state]}
+        </span>
         <span className="spacer" />
         {isLogs && (
           <label className="check"><input type="checkbox" checked={logTimestamps} onChange={(e) => update({ logTimestamps: e.target.checked })} /> Timestamps</label>

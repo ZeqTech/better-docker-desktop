@@ -277,6 +277,23 @@ export function groupByProject(list: Container[]): [string, Container[]][] {
   return [...map.entries()].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
 }
 
+/** Apply a saved project order; projects missing from it keep their alphabetical place after the ordered ones. Ungrouped containers stay last. */
+export function orderGroups(groups: [string, Container[]][], order: string[]): [string, Container[]][] {
+  const rank = (p: string) => (p === "" ? Infinity : order.includes(p) ? order.indexOf(p) : order.length);
+  return [...groups].sort(([a], [b]) => rank(a) - rank(b) || (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+}
+
+/** New saved order after moving `project` one step up or down among the shown projects. */
+export function moveProject(shown: string[], order: string[], project: string, dir: -1 | 1): string[] {
+  const names = shown.filter((p) => p !== "");
+  const i = names.indexOf(project);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= names.length) return order;
+  [names[i], names[j]] = [names[j], names[i]];
+  // Keep remembered projects that are not currently shown (e.g. filtered out) after the visible ones.
+  return [...names, ...order.filter((p) => !names.includes(p))];
+}
+
 // ---- image layers ---------------------------------------------------------------------
 
 export interface Layer {

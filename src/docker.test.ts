@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionsFor, cleanLayerCommand, formatDuration, formatSize, groupByProject, hostPorts, labelValue, matches,
+  actionsFor, cleanLayerCommand, formatDuration, formatSize, groupByProject, hostPorts, labelValue, matches, moveProject, orderGroups,
   parseDiskUsage, parseLines, parseSize, shortId, sortRows, stripAnsi, timeAgo, toBuilds, toContainers, toImages, toLayers,
   type Row,
 } from "./docker";
@@ -151,5 +151,17 @@ describe("image layers", () => {
     expect(layers.map((l) => l.command)).toEqual(["RUN apk add curl", "CMD x"]);
     expect(layers[0]).toMatchObject({ id: "", size: 12.5e6 });
     expect(layers[1].id).toBe("79bd7c99e923");
+  });
+});
+
+describe("group order", () => {
+  const g = (...n: string[]): [string, never[]][] => n.map((x) => [x, []]);
+  it("applies the saved order, unknown projects after, ungrouped last", () => {
+    expect(orderGroups(g("a", "b", "c", ""), ["c", "a"]).map(([p]) => p)).toEqual(["c", "a", "b", ""]);
+  });
+  it("moves a project up or down and keeps hidden ones", () => {
+    expect(moveProject(["a", "b", "c", ""], [], "c", -1)).toEqual(["a", "c", "b"]);
+    expect(moveProject(["a", "b"], ["z", "a"], "a", 1)).toEqual(["b", "a", "z"]);
+    expect(moveProject(["a", "b"], ["a"], "a", -1)).toEqual(["a"]);
   });
 });

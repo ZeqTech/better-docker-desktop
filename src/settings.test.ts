@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULTS, checkEngineJson, parseSettings, pollMs } from "./settings";
+import { DEFAULTS, accentIds, checkEngineJson, parseSettings, pollMs } from "./settings";
 
 describe("parseSettings", () => {
   it("returns defaults for missing or broken input", () => {
@@ -34,6 +34,19 @@ describe("parseSettings", () => {
     const s = parseSettings(JSON.stringify({ accent: "teal", startPage: "networks" }));
     expect(s.accent).toBe("burgundy");
     expect(s.startPage).toBe("last");
+  });
+});
+
+describe("themes", () => {
+  it("defaults to ruby and accepts known themes", () => {
+    expect(DEFAULTS.theme).toBe("ruby");
+    expect(parseSettings(JSON.stringify({ theme: "emerald", accent: "jade" }))).toMatchObject({ theme: "emerald", accent: "jade" });
+    expect(parseSettings(JSON.stringify({ theme: "teal" })).theme).toBe("ruby");
+  });
+  it("falls back to the theme's first accent when the accent belongs to another theme", () => {
+    const s = parseSettings(JSON.stringify({ theme: "sapphire", accent: "crimson" }));
+    expect(s.accent).toBe(accentIds("sapphire")[0]);
+    expect(parseSettings(JSON.stringify({ accent: "azure" })).accent).toBe("burgundy");
   });
 });
 

@@ -1,6 +1,6 @@
 # Better Docker Desktop
 
-A lean Docker Desktop alternative in Tauri v2 with a dark red / burgundy theme. It is **local only**: it talks to the Docker Engine on this machine through the `docker` command line and has no remote features. The one network use is pulling an image when you ask for it.
+A lean Docker Desktop alternative in Tauri v2 with a selectable ruby (default), emerald or sapphire dark theme, each with its own accents. It is **local only**: it talks to the Docker Engine on this machine through the `docker` command line and has no remote features. The one network use is pulling an image when you ask for it.
 
 Layout follows Docker Desktop: sidebar, summary cards, sortable tables, status bar.
 

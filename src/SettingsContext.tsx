@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ACCENTS, DEFAULTS, saveSettings, type Settings } from "./settings";
+import { THEMES, DEFAULTS, accentFor, saveSettings, type Settings } from "./settings";
 
 interface SettingsApi {
   settings: Settings;
@@ -11,13 +11,14 @@ const Ctx = createContext<SettingsApi>({ settings: DEFAULTS, update: () => {}, r
 
 export const useSettings = () => useContext(Ctx);
 
-/** Applies the accent colour and density to the document and persists every change. */
+/** Applies the theme, accent colour and density to the document and persists every change. */
 export function SettingsProvider({ initial, children }: { initial: Settings; children: ReactNode }) {
   const [settings, setSettings] = useState(initial);
 
   useEffect(() => {
-    const a = ACCENTS[settings.accent];
+    const a = accentFor(settings.theme, settings.accent);
     const root = document.documentElement.style;
+    for (const [k, v] of Object.entries(THEMES[settings.theme].vars)) root.setProperty(k, v);
     root.setProperty("--accent", a.accent);
     root.setProperty("--accent-hi", a.hi);
     root.setProperty("--accent-soft", a.soft);

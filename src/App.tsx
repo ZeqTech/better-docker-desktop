@@ -6,8 +6,8 @@ import { CleanupDialog } from "./CleanupDialog";
 import { ContainersView } from "./ContainersView";
 import { ImagesView } from "./ImagesView";
 import { KubeMap } from "./KubeMap";
-import { KubeNav } from "./KubeNav";
-import { EventsView, NodesView, PodsView, ServicesView, WorkloadsView } from "./KubeViews";
+import { KubeBar, KubeNav } from "./KubeNav";
+import { EventsView, NodesView, PodsView, ServicesView, WorkloadsView, type OpenPod } from "./KubeViews";
 import { KUBE_PAGES, type KubePageId } from "./kube";
 import { SettingsView } from "./SettingsView";
 import { useSettings } from "./SettingsContext";
@@ -51,6 +51,7 @@ export default function App() {
   const status = useData(api.status, starting ? 2000 : 5000);
   const kubeStatus = useData(api.kubeStatus, 0, refreshKey);
   const [kubeContext, setKubeContext] = useState(() => localStorage.getItem("kube.context") ?? "");
+  const [openPod, setOpenPod] = useState<OpenPod | null>(null);
   const [kubeNamespace, setKubeNamespace] = useState(() => localStorage.getItem("kube.namespace") ?? "");
   const nextId = useRef(0);
   const autoTried = useRef(false);
@@ -76,6 +77,15 @@ export default function App() {
     setKubeNamespace(ns);
     localStorage.setItem("kube.namespace", ns);
   };
+  // Open a pod's full-screen view on the Pods page (the map's "Open full screen" uses this).
+  const showPod = (p: OpenPod) => {
+    if (kubeNamespace && kubeNamespace !== p.ns) chooseNamespace(p.ns);
+    setOpenPod(p);
+    setPage("k-pods");
+  };
+  useEffect(() => {
+    if (page !== "k-pods") setOpenPod(null);
+  }, [page]);
   const isKubePage = KUBE_PAGES.includes(page as KubePageId);
 
   const notify = useCallback((text: string, kind: "ok" | "error" = "ok") => {
@@ -186,11 +196,7 @@ export default function App() {
           <div className="nav-group">Kubernetes</div>
           <KubeNav
             status={kStatus ?? null}
-            context={activeContext}
-            namespace={kubeNamespace}
             page={page}
-            onContext={chooseContext}
-            onNamespace={chooseNamespace}
             onPage={setPage}
           />
           <div className="sidebar-foot">
@@ -217,13 +223,16 @@ export default function App() {
           {page === "images" && <ImagesView refreshKey={refreshKey} ticks={ticks} />}
           {page === "volumes" && <VolumesView refreshKey={refreshKey} ticks={ticks} />}
           {page === "builds" && <BuildsView refreshKey={refreshKey} ticks={ticks} />}
+          {isKubePage && kStatus && activeContext && (
+            <KubeBar status={kStatus} context={activeContext} namespace={kubeNamespace} onContext={chooseContext} onNamespace={chooseNamespace} />
+          )}
           {isKubePage && !activeContext && <div className="empty">{kStatus?.error ?? "Checking kubectl…"}</div>}
           {isKubePage && activeContext && (
             // Keyed so a different context or namespace starts from a clean fetch.
             <div className="kube-page" key={`${activeContext}|${kubeNamespace}|${refreshKey}`}>
-              {page === "k-map" && <KubeMap kube={kube} />}
+              {page === "k-map" && <KubeMap kube={kube} onOpenPod={showPod} />}
               {page === "k-nodes" && <NodesView kube={kube} />}
-              {page === "k-pods" && <PodsView kube={kube} />}
+              {page === "k-pods" && <PodsView kube={kube} initial={openPod} onBackToMap={() => setPage("k-map")} />}
               {page === "k-workloads" && <WorkloadsView kube={kube} />}
               {page === "k-services" && <ServicesView kube={kube} />}
               {page === "k-events" && <EventsView kube={kube} />}

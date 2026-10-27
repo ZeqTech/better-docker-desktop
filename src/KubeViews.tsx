@@ -139,14 +139,25 @@ function PodTable({ pods, showNamespace, onOpen, loading }: { pods: KubePod[]; s
   );
 }
 
-export function PodsView({ kube }: { kube: KubeSel }) {
+export interface OpenPod {
+  ns: string;
+  name: string;
+  tab: PodTab;
+  /** Where "back" returns to; the Pods list when empty. */
+  from?: "map";
+}
+
+export function PodsView({ kube, initial, onBackToMap }: { kube: KubeSel; initial?: OpenPod | null; onBackToMap?(): void }) {
   const list = useKubeList(kube, "pods", (i) => toPods(i));
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<{ ns: string; name: string } | null>(null);
+  const [open, setOpen] = useState<OpenPod | null>(initial ?? null);
   const pods = list.data ?? [];
   const shown = useMemo(() => pods.filter((p) => matches(query, p.name, p.namespace, p.status, p.node)), [pods, query]);
   const current = open && pods.find((p) => p.name === open.name && p.namespace === open.ns);
-  if (open && current) return <PodDetail kube={kube} pod={current} onBack={() => setOpen(null)} onChanged={() => void list.reload()} />;
+  if (open && current) {
+    const toMap = open.from === "map" && onBackToMap;
+    return <PodDetail kube={kube} pod={current} back={toMap ? "Map" : "Pods"} initialTab={open.tab} onBack={() => (toMap ? onBackToMap() : setOpen(null))} onChanged={() => void list.reload()} />;
+  }
   const bad = pods.filter((p) => podState(p.status) === "exited").length;
   return (
     <section className="view">
@@ -158,16 +169,16 @@ export function PodsView({ kube }: { kube: KubeSel }) {
       ]} />
       <div className="toolbar"><SearchBox value={query} onChange={setQuery} /></div>
       {list.error && <div className="banner">{list.error}</div>}
-      <PodTable pods={shown} showNamespace={!kube.namespace} onOpen={(p) => setOpen({ ns: p.namespace, name: p.name })} loading={list.loading} />
+      <PodTable pods={shown} showNamespace={!kube.namespace} onOpen={(p) => setOpen({ ns: p.namespace, name: p.name, tab: "logs" })} loading={list.loading} />
     </section>
   );
 }
 
-function PodDetail({ kube, pod, onBack, onChanged }: { kube: KubeSel; pod: KubePod; onBack(): void; onChanged(): void }) {
+function PodDetail({ kube, pod, back, initialTab, onBack, onChanged }: { kube: KubeSel; pod: KubePod; back: string; initialTab?: PodTab; onBack(): void; onChanged(): void }) {
   return (
     <section className="view">
       <header className="view-head">
-        <button onClick={onBack}>← Pods</button>
+        <button onClick={onBack}>← {back}</button>
         <StatusDot state={podState(pod.status)} />
         <h1>{pod.name}</h1>
         <small className="muted">{pod.namespace}</small>
@@ -176,27 +187,30 @@ function PodDetail({ kube, pod, onBack, onChanged }: { kube: KubeSel; pod: KubeP
         <span>Status <b>{pod.status}</b></span><span>Ready <b>{pod.ready}</b></span><span>Restarts <b>{pod.restarts}</b></span>
         <span>Node <b>{pod.node || "-"}</b></span><span>IP <b>{pod.ip || "-"}</b></span>
       </div>
-      <PodTabs kube={kube} pod={pod} onChanged={onChanged} onRemoved={onBack} />
+      <PodTabs kube={kube} pod={pod} initialTab={initialTab} onChanged={onChanged} onRemoved={onBack} />
     </section>
   );
 }
 
-type PodTab = "overview" | "logs" | "shell" | "containers" | "events" | "describe" | "yaml";
+export type PodTab = "overview" | "logs" | "shell" | "containers" | "events" | "describe" | "yaml";
 
 /**
  * Everything you can do with one pod: actions, then tabs for logs, shell, containers, events,
  * describe and YAML. With `overview` it gets a first tab holding that content (the map's panel).
  */
-export function PodTabs({ kube, pod, overview, onChanged, onRemoved }: {
+export function PodTabs({ kube, pod, overview, initialTab, onOpenFull, onChanged, onRemoved }: {
   kube: KubeSel;
   pod: KubePod;
   overview?: ReactNode;
+  initialTab?: PodTab;
+  /** Shows an "Open full screen" button that receives the current tab. */
+  onOpenFull?(tab: PodTab): void;
   onChanged(): void;
   onRemoved(): void;
 }) {
   const app = useApp();
-  const [tab, setTab] = useState<PodTab>(overview ? "overview" : "logs");
-  const [shellOpened, setShellOpened] = useState(false);
+  const [tab, setTab] = useState<PodTab>(initialTab ?? (overview ? "overview" : "logs"));
+  const [shellOpened, setShellOpened] = useState(initialTab === "shell");
   const [container, setContainer] = useState(pod.containers[0]?.name ?? "");
   const running = pod.status === "Running";
   const kc = `kubectl --context ${kube.context} -n ${pod.namespace}`;
@@ -223,12 +237,19 @@ export function PodTabs({ kube, pod, overview, onChanged, onRemoved }: {
   ];
   return (
     <>
-      <div className="toolbar">
-        <button onClick={() => copy(pod.name, "pod name")}>Copy name</button>
-        <button onClick={() => copy(`${kc} logs -f ${pod.name}${container ? ` -c ${container}` : ""}`, "logs command")} title="Copy a kubectl logs command">Copy logs cmd</button>
-        <button onClick={() => copy(`${kc} exec -it ${pod.name}${container ? ` -c ${container}` : ""} -- sh`, "exec command")} title="Copy a kubectl exec command">Copy exec cmd</button>
+      <div className="toolbar pod-actions">
+        <details className="menu">
+          <summary>Copy</summary>
+          <div className="menu-pop" onClick={(e) => e.currentTarget.parentElement?.removeAttribute("open")}>
+            <button onClick={() => copy(pod.name, "pod name")}>Pod name</button>
+            <button onClick={() => copy(`${kc} logs -f ${pod.name}${container ? ` -c ${container}` : ""}`, "logs command")}>kubectl logs command</button>
+            <button onClick={() => copy(`${kc} exec -it ${pod.name}${container ? ` -c ${container}` : ""} -- sh`, "exec command")}>kubectl exec command</button>
+            <button onClick={() => copy(`${kc} describe pod ${pod.name}`, "describe command")}>kubectl describe command</button>
+          </div>
+        </details>
+        {onOpenFull && <button onClick={() => onOpenFull(tab)} title="Open this pod on the Pods page, full width">Open full screen ↗</button>}
         <span className="spacer" />
-        <button className="danger" onClick={() => void remove()}>Delete</button>
+        <button className="icon danger" onClick={() => void remove()} title="Delete pod" aria-label="Delete pod">🗑</button>
       </div>
       <Tabs tabs={tabs} tab={tab} onTab={(t) => { setTab(t as PodTab); if (t === "shell") setShellOpened(true); }} />
       <div className="tab-body">
